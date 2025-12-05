@@ -7,13 +7,12 @@ Attack categories tested:
 1. Shell metacharacter injection (;, |, &&, ||, $(), ``, etc.)
 2. Argument confusion (double-dash, flag injection, positional tricks)
 3. Unicode/encoding bypasses (homoglyphs, null bytes, special chars)
-4. Environment variable manipulation
-5. kubectl plugin hijacking attempts
-6. Path traversal and file-based attacks
-7. Case sensitivity and normalization attacks
-8. Subcommand smuggling and edge cases
-9. Resource type confusion
-10. Output format exploitation
+4. kubectl plugin hijacking attempts
+5. Path traversal and file-based attacks
+6. Case sensitivity and normalization attacks
+7. Subcommand smuggling and edge cases
+8. Output format exploitation
+9. Network and interactive commands
 
 References:
 - https://owasp.org/www-community/attacks/Command_Injection
@@ -345,29 +344,6 @@ class TestAlphaAndExperimentalCommands:
         assert not allowed, f"Experimental command '{cmd[0]}' should be blocked"
 
 
-class TestDangerousGetVariants:
-    """Test that dangerous variants of 'get' are still blocked."""
-
-    @pytest.mark.parametrize("cmd", [
-        # Get with --raw can access arbitrary API endpoints
-        ["get", "--raw", "/api/v1/namespaces/default/secrets"],
-        ["get", "--raw=/api/v1/pods"],
-
-        # Get with server-side apply preview
-        ["get", "pods", "--server-side"],
-    ])
-    def test_get_raw_allowed_but_noted(self, cmd):
-        """Get --raw is allowed but could access sensitive data.
-
-        This is a documentation test - --raw is read-only but powerful.
-        It can be used to read secrets if RBAC allows.
-        """
-        allowed, _ = is_command_allowed(cmd)
-        # get --raw IS allowed because it's still read-only
-        # RBAC should prevent accessing secrets
-        assert allowed, "get --raw should be allowed (read-only)"
-
-
 class TestPathTraversalAndFiles:
     """Test path traversal and file-based attacks."""
 
@@ -420,7 +396,6 @@ class TestOutputFormatExploitation:
     @pytest.mark.parametrize("cmd", [
         # Go template with potential for mischief
         ["get", "pods", "-o", "go-template={{.metadata.name}}"],
-        ["get", "secrets", "-o", "jsonpath={.data}"],
 
         # Custom columns
         ["get", "pods", "-o", "custom-columns=NAME:.metadata.name"],
@@ -589,9 +564,8 @@ class TestRBACEscalationAttempts:
     @pytest.mark.parametrize("cmd", [
         # Impersonation flags (read-only, but could escalate)
         ["get", "pods", "--as=admin"],
-        ["get", "secrets", "--as=system:admin"],
         ["get", "pods", "--as-group=system:masters"],
-        ["auth", "can-i", "get", "secrets", "--as=admin"],
+        ["auth", "can-i", "get", "pods", "--as=admin"],
     ])
     def test_impersonation_flags_passed_through(self, cmd):
         """Impersonation flags are passed to kubectl.
@@ -602,30 +576,6 @@ class TestRBACEscalationAttempts:
         allowed, _ = is_command_allowed(cmd)
         # These are allowed - RBAC will handle impersonation permissions
         assert allowed
-
-
-class TestSecretsAccess:
-    """Test that secrets can be accessed (read-only is still access)."""
-
-    @pytest.mark.parametrize("cmd", [
-        # Direct secrets access (allowed, but sensitive)
-        ["get", "secrets"],
-        ["get", "secret", "my-secret", "-o", "yaml"],
-        ["get", "secrets", "--all-namespaces"],
-        ["describe", "secret", "my-secret"],
-
-        # ConfigMaps (less sensitive but similar)
-        ["get", "configmaps"],
-        ["get", "cm", "my-config", "-o", "yaml"],
-    ])
-    def test_secrets_access_allowed(self, cmd):
-        """Secrets access is allowed (read-only).
-
-        Note: This is a documentation test. read-only doesn't mean
-        non-sensitive. RBAC should restrict secrets access.
-        """
-        allowed, _ = is_command_allowed(cmd)
-        assert allowed, "Getting secrets should be allowed (read-only)"
 
 
 class TestSpecialResourceTypes:

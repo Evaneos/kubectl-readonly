@@ -76,6 +76,26 @@ BLOCKED: Command 'delete' is not in the read-only allowlist
 | `auth` | `can-i`, `whoami` |
 | `rollout` | `status`, `history` |
 
+## Secrets Protection
+
+`kubectl-readonly` allows you to see that secrets exist (metadata) but blocks access to their actual values:
+
+```bash
+# Allowed - shows secret names, types, and ages (no values)
+kubectl-readonly get secrets
+kubectl-readonly get secrets -o wide
+kubectl-readonly get secrets -o name
+kubectl-readonly describe secret my-secret  # shows size, not values
+
+# Blocked - these formats expose the base64-encoded values
+kubectl-readonly get secrets -o yaml
+kubectl-readonly get secrets -o json
+kubectl-readonly get secret my-secret -o jsonpath='{.data}'
+kubectl-readonly get --raw /api/v1/secrets
+```
+
+This lets you investigate which secrets exist and how they're configured, without risk of accidentally exposing credentials in logs or terminal history.
+
 ## Claude Code Integration
 
 This tool was designed to let AI assistants safely explore Kubernetes clusters.

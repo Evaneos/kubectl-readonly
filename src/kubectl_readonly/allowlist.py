@@ -4,6 +4,26 @@ Philosophy: When in doubt, block. Better to have false negatives (blocking safe
 commands) than false positives (allowing dangerous commands).
 """
 
+# Secret resource types - accessing VALUES requires special handling
+SECRET_RESOURCES: frozenset[str] = frozenset({
+    "secret",
+    "secrets",
+})
+
+# Output formats that expose secret values (base64 encoded data)
+# These formats include the .data field which contains actual secret values
+SECRET_EXPOSING_OUTPUT_FORMATS: frozenset[str] = frozenset({
+    "yaml",
+    "json",
+    "jsonpath",
+    "jsonpath-as-json",
+    "jsonpath-file",
+    "go-template",
+    "go-template-file",
+    "template",
+    "templatefile",
+})
+
 # Commands that are always safe (no subcommand validation needed)
 SAFE_COMMANDS: frozenset[str] = frozenset({
     "get",
@@ -186,6 +206,161 @@ def extract_command_and_subcommand(args: list[str]) -> tuple[str | None, str | N
     return command, subcommand
 
 
+def extract_resource_types(args: list[str]) -> list[str]:
+    """Extract resource types from kubectl arguments.
+
+    Resource types can appear in various forms:
+    - kubectl get pods
+    - kubectl get pod/nginx
+    - kubectl get pods,services
+    - kubectl get pod nginx
+    - kubectl describe secret my-secret
+
+    Returns:
+        List of resource type names (lowercase, singular or plural).
+    """
+    resources = []
+    command, _ = extract_command_and_subcommand(args)
+
+    if command not in ("get", "describe", "wait", "events"):
+        return resources
+
+    i = 0
+    found_command = False
+
+    while i < len(args):
+        arg = args[i]
+
+        if is_flag(arg):
+            # Skip flag and its value if applicable
+            if "=" in arg:
+                i += 1
+            elif is_flag_with_value(arg):
+                i += 2
+            else:
+                i += 1
+            continue
+
+        if not found_command:
+            if arg == command:
+                found_command = True
+            i += 1
+            continue
+
+        # After the command, look for resource types
+        # Handle comma-separated resources: pods,secrets,configmaps
+        for part in arg.split(","):
+            # Handle type/name format: secret/my-secret
+            if "/" in part:
+                resource_type = part.split("/")[0]
+            else:
+                resource_type = part
+
+            # Normalize to lowercase
+            resource_type = resource_type.lower()
+
+            # Skip if it looks like a name (contains certain patterns)
+            # Resource types are typically simple words
+            if resource_type and not resource_type.startswith("-"):
+                resources.append(resource_type)
+
+        i += 1
+
+    return resources
+
+
+def get_output_format(args: list[str]) -> str | None:
+    """Extract the output format from arguments.
+
+    Returns:
+        The output format (e.g., 'yaml', 'json', 'jsonpath={...}') or None.
+    """
+    for i, arg in enumerate(args):
+        if arg in ("-o", "--output") and i + 1 < len(args):
+            return args[i + 1]
+        elif arg.startswith("-o="):
+            return arg[3:]
+        elif arg.startswith("--output="):
+            return arg[9:]
+        elif arg.startswith("-o") and len(arg) > 2:
+            # Handle -ojson, -oyaml format
+            return arg[2:]
+
+    return None
+
+
+def is_secret_value_exposing_format(output_format: str | None) -> bool:
+    """Check if the output format would expose secret values.
+
+    Args:
+        output_format: The output format string (e.g., 'yaml', 'jsonpath={.data}')
+
+    Returns:
+        True if this format would expose the secret's .data field.
+    """
+    if output_format is None:
+        return False
+
+    # Normalize and check base format
+    format_lower = output_format.lower()
+
+    # Check for exact matches or prefix matches (e.g., 'jsonpath={...}')
+    for exposing_format in SECRET_EXPOSING_OUTPUT_FORMATS:
+        if format_lower == exposing_format or format_lower.startswith(exposing_format + "="):
+            return True
+
+    return False
+
+
+def contains_secret_resource(args: list[str]) -> tuple[bool, str | None]:
+    """Check if the command targets a secret resource type.
+
+    Returns:
+        Tuple of (targets_secret, resource_name).
+    """
+    resources = extract_resource_types(args)
+
+    for resource in resources:
+        if resource in SECRET_RESOURCES:
+            return True, resource
+
+    return False, None
+
+
+def contains_raw_secrets_access(args: list[str]) -> bool:
+    """Check if --raw flag is used to access secrets API endpoints.
+
+    The --raw flag allows direct API access and can bypass resource type checks.
+    We need to block any --raw access to secrets endpoints.
+    """
+    raw_value = None
+
+    for i, arg in enumerate(args):
+        if arg == "--raw" and i + 1 < len(args):
+            raw_value = args[i + 1]
+            break
+        elif arg.startswith("--raw="):
+            raw_value = arg[6:]  # Remove "--raw=" prefix
+            break
+
+    if raw_value is None:
+        return False
+
+    # Check if the raw path contains secrets
+    raw_lower = raw_value.lower()
+    sensitive_patterns = [
+        "/secrets",
+        "/secret/",
+        "secrets/",
+    ]
+
+    for pattern in sensitive_patterns:
+        if pattern in raw_lower:
+            return True
+
+    return False
+
+
 def is_command_allowed(args: list[str]) -> tuple[bool, str]:
     """Check if a kubectl command is allowed.
 
@@ -209,6 +384,19 @@ def is_command_allowed(args: list[str]) -> tuple[bool, str]:
 
     # Check if it's a simple safe command
     if command in SAFE_COMMANDS:
+        # Check if accessing secrets
+        targets_secret, resource = contains_secret_resource(args)
+        if targets_secret:
+            # Allow listing/describing secrets (metadata only)
+            # Block output formats that expose the actual secret values
+            output_format = get_output_format(args)
+            if is_secret_value_exposing_format(output_format):
+                return False, f"Output format '{output_format}' exposes secret values. Use default format or '-o name' to see secret metadata only."
+
+        # Block --raw access to secrets API endpoints (always exposes values)
+        if contains_raw_secrets_access(args):
+            return False, "Access to secrets via --raw is not allowed (exposes secret values)"
+
         return True, ""
 
     # Check if it's a command that requires subcommand validation
