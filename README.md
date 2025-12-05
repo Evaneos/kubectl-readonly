@@ -1,18 +1,17 @@
 # kubectl-readonly
 
+[![CI](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml/badge.svg)](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml)
+
 A safe kubectl wrapper that only allows read-only commands. Ideal for giving AI assistants (like Claude) unrestricted access to explore Kubernetes clusters, including production, without risk of accidental modifications.
 
 ## Installation
 
+Requires [uv](https://docs.astral.sh/uv/):
+
 ```bash
-# With uv (recommended)
-uv tool install kubectl-readonly
-
-# With pip
-pip install kubectl-readonly
-
-# With pipx
-pipx install kubectl-readonly
+git clone https://github.com/evaneos/kubectl-readonly.git
+cd kubectl-readonly
+uv tool install -e .
 ```
 
 ## Usage
@@ -152,21 +151,10 @@ Claude can then run any read-only kubectl command without asking for permission,
 
 **When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
 
-## Development
+## Contributing
 
-```bash
-# Clone and install dependencies
-git clone https://github.com/evaneos/kubectl-readonly.git
-cd kubectl-readonly
-uv sync
-
-# Run tests
-uv run pytest -v
-
-# Install locally for testing
-uv tool install -e .
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
