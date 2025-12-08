@@ -4,15 +4,31 @@
 
 A safe kubectl wrapper that only allows read-only commands. Ideal for giving AI assistants (like Claude) unrestricted access to explore Kubernetes clusters, including production, without risk of accidental modifications.
 
+## Requirements
+
+- `kubectl` must be installed and available in your PATH
+
 ## Installation
 
-Requires [uv](https://docs.astral.sh/uv/):
+### From binary (recommended)
+
+Download the latest binary from the [releases page](https://github.com/Evaneos/kubectl-readonly/releases) and add it to your PATH.
+
+### From source
+
+Requires Go 1.25+:
 
 ```bash
-git clone https://github.com/evaneos/kubectl-readonly.git
-cd kubectl-readonly
-uv tool install -e .
+go install github.com/Evaneos/kubectl-readonly@latest
 ```
+
+### Supported platforms
+
+| OS | Architecture |
+|----|--------------|
+| Linux | amd64, arm64 |
+| macOS | amd64, arm64 |
+| Windows | amd64, arm64 |
 
 ## Usage
 
@@ -38,13 +54,13 @@ Reason: Command 'delete' is not in the read-only allowlist
 
 ### Check mode
 
-Use `--check-readonly-ok` to verify if a command would be allowed without executing it:
+Use `--readonly-check-ok` to verify if a command would be allowed without executing it:
 
 ```bash
-$ kubectl-readonly --check-readonly-ok get pods
+$ kubectl-readonly --readonly-check-ok get pods
 OK: This command is allowed by kubectl-readonly
 
-$ kubectl-readonly --check-readonly-ok delete pod my-pod
+$ kubectl-readonly --readonly-check-ok delete pod my-pod
 BLOCKED: Command 'delete' is not in the read-only allowlist
 ```
 
@@ -94,6 +110,18 @@ kubectl-readonly get --raw /api/v1/secrets
 ```
 
 This lets you investigate which secrets exist and how they're configured, without risk of accidentally exposing credentials in logs or terminal history.
+
+## Long-running commands
+
+Some read-only commands can run indefinitely. These are allowed:
+
+```bash
+kubectl-readonly get pods --watch      # Watch for changes
+kubectl-readonly logs my-pod -f        # Follow logs (stream)
+kubectl-readonly top pods --watch      # Continuous resource monitoring
+```
+
+These commands are safe (read-only) but will run until interrupted with Ctrl+C.
 
 ## Claude Code Integration
 
@@ -150,6 +178,22 @@ Claude can then run any read-only kubectl command without asking for permission,
 ## Philosophy
 
 **When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+
+## Releases
+
+This project uses [GoReleaser](https://goreleaser.com/) to automate releases. When a new tag is pushed, GitHub Actions automatically builds binaries for all supported platforms and creates a GitHub release.
+
+To create a new release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Each release includes:
+- Pre-built binaries for all platforms
+- SHA256 checksums (`checksums.txt`)
+- Automatically generated changelog
 
 ## Contributing
 

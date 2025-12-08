@@ -1,10 +1,15 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Binaries
+kubectl-readonly
+kubectl-readonly-*
+*.exe
 
-# Virtual environments
-.venv
+# IDE
+.idea/
+.vscode/
+
+# Test coverage
+coverage.out
+*.out
+
+# OS
+.DS_Store
