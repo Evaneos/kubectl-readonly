@@ -143,6 +143,9 @@ EXAMPLES:
 ALIAS:
     For convenience, you can create an alias:
         alias kro='kubectl-readonly'
+
+    Or use as a kubectl plugin (if installed via Krew):
+        kubectl readonly get pods
 `)
 }
 
