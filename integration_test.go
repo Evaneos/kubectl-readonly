@@ -65,7 +65,14 @@ func setupTestEnv(t *testing.T) *testEnv {
 	env.binaryPath = absPath
 
 	// Create plugin directory with symlink
-	env.pluginDir = t.TempDir()
+	// Note: We use os.MkdirTemp instead of t.TempDir() because globalEnv is shared
+	// across all tests. t.TempDir() would clean up the directory when the first
+	// test that created it finishes, breaking subsequent plugin tests.
+	pluginDir, err := os.MkdirTemp("", "kubectl-readonly-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create plugin directory: %v", err)
+	}
+	env.pluginDir = pluginDir
 	pluginPath := filepath.Join(env.pluginDir, "kubectl-readonly")
 	if err := os.Symlink(absPath, pluginPath); err != nil {
 		t.Fatalf("Failed to create plugin symlink: %v", err)
@@ -290,6 +297,10 @@ var globalEnv *testEnv
 func TestMain(m *testing.M) {
 	// This only runs when integration tag is set
 	code := m.Run()
+	// Cleanup the plugin directory if it was created
+	if globalEnv != nil && globalEnv.pluginDir != "" {
+		os.RemoveAll(globalEnv.pluginDir)
+	}
 	os.Exit(code)
 }
 
