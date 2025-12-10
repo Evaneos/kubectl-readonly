@@ -1,6 +1,9 @@
 # kubectl-readonly
 
 [![CI](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml/badge.svg)](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Evaneos/kubectl-readonly)](https://goreportcard.com/report/github.com/Evaneos/kubectl-readonly)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/github/go-mod-go-version/Evaneos/kubectl-readonly)](https://go.dev/)
 
 A safe kubectl wrapper that only allows read-only commands. Ideal for giving AI assistants (like Claude) unrestricted access to explore Kubernetes clusters, including production, without risk of accidental modifications.
 
@@ -10,7 +13,23 @@ A safe kubectl wrapper that only allows read-only commands. Ideal for giving AI 
 
 ## Installation
 
-### From binary (recommended)
+### Via Krew (recommended)
+
+If you have [Krew](https://krew.sigs.k8s.io/) installed:
+
+```bash
+kubectl krew install readonly
+```
+
+Then use it as a kubectl plugin:
+
+```bash
+kubectl readonly get pods
+kubectl readonly describe deployment nginx
+kubectl readonly logs my-pod -f
+```
+
+### From binary
 
 Download the latest binary from the [releases page](https://github.com/Evaneos/kubectl-readonly/releases) and add it to your PATH.
 
@@ -32,9 +51,15 @@ go install github.com/Evaneos/kubectl-readonly@latest
 
 ## Usage
 
-Use `kubectl-readonly` exactly like `kubectl`:
+Use `kubectl readonly` (as a plugin) or `kubectl-readonly` (standalone) exactly like `kubectl`:
 
 ```bash
+# As a kubectl plugin
+kubectl readonly get pods
+kubectl readonly describe deployment nginx
+kubectl readonly logs my-pod -f
+
+# Or standalone
 kubectl-readonly get pods
 kubectl-readonly get pods -n kube-system -o wide
 kubectl-readonly describe deployment nginx
