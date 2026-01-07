@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -1085,5 +1086,105 @@ func TestContainsRawSecretsAccess(t *testing.T) {
 				t.Errorf("expected no raw secrets access: %v", args)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Environment Variable Security Tests
+// =============================================================================
+
+func TestGetSafeEnvironment(t *testing.T) {
+	// Save and restore original environment
+	origEnv := os.Environ()
+	defer func() {
+		os.Clearenv()
+		for _, env := range origEnv {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				os.Setenv(parts[0], parts[1])
+			}
+		}
+	}()
+
+	// Set test environment
+	os.Clearenv()
+	os.Setenv("HOME", "/home/user")
+	os.Setenv("PATH", "/usr/bin")
+	os.Setenv("KUBECONFIG", "/home/user/.kube/config")
+	os.Setenv("KUBECTL_EXTERNAL_DIFF", "/tmp/evil.sh") // Should be blocked
+	os.Setenv("USER", "testuser")
+	os.Setenv("LANG", "en_US.UTF-8")
+
+	safeEnv := getSafeEnvironment()
+	envMap := make(map[string]string)
+	for _, env := range safeEnv {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Verify safe vars are passed through
+	if envMap["HOME"] != "/home/user" {
+		t.Error("HOME should be passed through")
+	}
+	if envMap["PATH"] != "/usr/bin" {
+		t.Error("PATH should be passed through")
+	}
+	if envMap["KUBECONFIG"] != "/home/user/.kube/config" {
+		t.Error("KUBECONFIG should be passed through")
+	}
+	if envMap["USER"] != "testuser" {
+		t.Error("USER should be passed through")
+	}
+	if envMap["LANG"] != "en_US.UTF-8" {
+		t.Error("LANG should be passed through")
+	}
+
+	// Verify dangerous vars are blocked
+	if _, exists := envMap["KUBECTL_EXTERNAL_DIFF"]; exists {
+		t.Error("KUBECTL_EXTERNAL_DIFF should be blocked (security vulnerability)")
+	}
+}
+
+func TestDangerousEnvVarsBlocked(t *testing.T) {
+	dangerousVars := []string{
+		"KUBECTL_EXTERNAL_DIFF",
+		"HTTP_PROXY",
+		"HTTPS_PROXY",
+		"NO_PROXY",
+	}
+
+	// Save and restore
+	origEnv := os.Environ()
+	defer func() {
+		os.Clearenv()
+		for _, env := range origEnv {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				os.Setenv(parts[0], parts[1])
+			}
+		}
+	}()
+
+	os.Clearenv()
+	for _, v := range dangerousVars {
+		os.Setenv(v, "/tmp/exploit")
+	}
+	os.Setenv("HOME", "/home/user") // Add one safe var
+
+	safeEnv := getSafeEnvironment()
+	envMap := make(map[string]string)
+	for _, env := range safeEnv {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	for _, dangerous := range dangerousVars {
+		if _, exists := envMap[dangerous]; exists {
+			t.Errorf("%s should be blocked for security", dangerous)
+		}
 	}
 }

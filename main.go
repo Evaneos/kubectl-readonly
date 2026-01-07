@@ -76,6 +76,33 @@ For a list of allowed commands, see: kubectl-readonly --help
 	return execKubectl(filteredArgs)
 }
 
+func getSafeEnvironment() []string {
+	// Only pass through essential environment variables to kubectl
+	// This prevents exploitation via kubectl-specific env vars like KUBECTL_EXTERNAL_DIFF
+	allowedPrefixes := []string{
+		"HOME=",
+		"USER=",
+		"PATH=",
+		"KUBECONFIG=",
+		"KUBERNETES_", // KUBERNETES_SERVICE_HOST, KUBERNETES_SERVICE_PORT, etc.
+		"LANG=",
+		"LC_",
+		"TERM=",
+		"TZ=",
+	}
+
+	var safeEnv []string
+	for _, env := range os.Environ() {
+		for _, prefix := range allowedPrefixes {
+			if strings.HasPrefix(env, prefix) {
+				safeEnv = append(safeEnv, env)
+				break
+			}
+		}
+	}
+	return safeEnv
+}
+
 func execKubectl(args []string) int {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
@@ -85,7 +112,7 @@ func execKubectl(args []string) int {
 
 	// Use syscall.Exec to replace the current process (more efficient)
 	execArgs := append([]string{"kubectl"}, args...)
-	if err := syscall.Exec(kubectlPath, execArgs, os.Environ()); err != nil {
+	if err := syscall.Exec(kubectlPath, execArgs, getSafeEnvironment()); err != nil {
 		fmt.Fprintf(os.Stderr, "Error executing kubectl: %v\n", err)
 		return 1
 	}

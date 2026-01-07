@@ -48,5 +48,6 @@ kubectl-readonly is designed with a **"deny by default"** philosophy:
 - Secret values are protected even for read operations
 - No shell interpretation of arguments (prevents injection)
 - Control characters in arguments are blocked
+- Environment variables are filtered to prevent control variable bypasses
 
 For more details, see the [Philosophy section](README.md#philosophy) in the README.
