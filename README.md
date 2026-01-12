@@ -202,7 +202,7 @@ Claude can then run any read-only kubectl command without asking for permission,
 
 ## Philosophy
 
-**When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+**When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked. Environment variables are filtered to prevent bypasses via kubectl control variables.
 
 ## Releases
 
