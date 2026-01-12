@@ -890,12 +890,12 @@ spec:
 		t.Errorf("kubectl delete should have worked: %v", err)
 	}
 
-	// 6. Verify pod is gone (or terminating)
+	// 6. Verify pod is gone (or terminating/completed)
 	time.Sleep(1 * time.Second)
 	stdout, _, _ = env.runDirect("get", "pod", podName, "-n", testNamespace)
-	// Pod should be gone or in Terminating state
-	if strings.Contains(stdout, podName) && !strings.Contains(stdout, "Terminating") {
-		t.Errorf("Pod should be deleted or terminating, got: %s", stdout)
+	// Pod should be gone, in Terminating state, or Completed (restartPolicy: Never)
+	if strings.Contains(stdout, podName) && !strings.Contains(stdout, "Terminating") && !strings.Contains(stdout, "Completed") {
+		t.Errorf("Pod should be deleted, terminating, or completed, got: %s", stdout)
 	}
 }
 

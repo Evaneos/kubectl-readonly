@@ -63,20 +63,20 @@ metadata:
 spec:
   version: ${VERSION}
   homepage: https://github.com/${REPO}
-  shortDescription: Safe kubectl wrapper that only allows read-only commands
+  shortDescription: Read-only kubectl wrapper to prevent accidental modifications
   description: |
-    A safe kubectl wrapper that only allows read-only commands.
-    Ideal for giving AI assistants (like Claude) unrestricted access to explore
-    Kubernetes clusters, including production, without risk of accidental modifications.
+    A kubectl wrapper that only allows read-only commands.
+    Designed to prevent accidental modifications when AI assistants (like Claude)
+    explore Kubernetes clusters, including production.
 
     Features:
     - Allowlist-based: Only explicitly allowed commands can run
     - Secrets protection: Can list secrets but not view their values
-    - Context switching: Can switch contexts safely
+    - Context switching: Can switch contexts without side effects
     - No side effects: All allowed commands are read-only
 
     Allowed commands include: get, describe, logs, top, explain, api-resources,
-    api-versions, cluster-info, version, events, wait, diff, and safe subcommands
+    api-versions, cluster-info, version, events, wait, diff, and read-only subcommands
     of config, auth, and rollout.
   caveats: |
     This plugin requires kubectl to be installed and available in your PATH.

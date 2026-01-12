@@ -55,7 +55,9 @@ make lint
 
 ## Philosophy
 
-**When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+**When in doubt, block.** This tool prefers false negatives (blocking legitimate commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+
+This tool prevents *accidental* destructive operations, not *malicious* attacks. See the README for the full threat model.
 
 ## Pull Requests
 
