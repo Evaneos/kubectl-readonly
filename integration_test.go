@@ -134,7 +134,7 @@ metadata:
   name: %s
 `, testNamespace))
 
-	// Create a test pod
+	// Create a test pod that stays running (using sleep to avoid nginx completing)
 	e.kubectl("apply", "-f", "-", "--input", fmt.Sprintf(`
 apiVersion: v1
 kind: Pod
@@ -145,11 +145,10 @@ metadata:
     app: test
 spec:
   containers:
-  - name: nginx
-    image: nginx:alpine
-    ports:
-    - containerPort: 80
-  restartPolicy: Never
+  - name: busybox
+    image: busybox:stable
+    command: ["sleep", "3600"]
+  restartPolicy: Always
 `, testNamespace))
 
 	// Create a test secret
@@ -199,9 +198,11 @@ spec:
         image: nginx:alpine
 `, testNamespace))
 
-	// Wait for resources to be ready
-	e.t.Log("Waiting for test resources to be ready...")
-	time.Sleep(2 * time.Second)
+	// Wait for test pod to be ready
+	e.t.Log("Waiting for test pod to be ready...")
+	if !e.waitForPodRunning("test-pod", testNamespace, 60*time.Second) {
+		e.t.Log("Warning: test-pod did not reach Running state within timeout")
+	}
 }
 
 // kubectl runs a kubectl command
@@ -282,6 +283,53 @@ func (e *testEnv) runPlugin(args ...string) (stdout, stderr string, exitCode int
 	return outBuf.String(), errBuf.String(), exitCode
 }
 
+// waitForPodRunning waits for a pod to be in Running state
+func (e *testEnv) waitForPodRunning(podName, namespace string, timeout time.Duration) bool {
+	e.t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		stdout, _, _ := e.runDirect("get", "pod", podName, "-n", namespace, "-o", "jsonpath={.status.phase}")
+		if strings.TrimSpace(stdout) == "Running" {
+			return true
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return false
+}
+
+// waitForPodExists waits for a pod to exist (any state)
+func (e *testEnv) waitForPodExists(podName, namespace string, timeout time.Duration) bool {
+	e.t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		stdout, _, exitCode := e.runDirect("get", "pod", podName, "-n", namespace)
+		if exitCode == 0 && strings.Contains(stdout, podName) {
+			return true
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return false
+}
+
+// waitForPodGone waits for a pod to be deleted or in Terminating state
+func (e *testEnv) waitForPodGone(podName, namespace string, timeout time.Duration) bool {
+	e.t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		stdout, _, exitCode := e.runDirect("get", "pod", podName, "-n", namespace)
+		// Pod is gone (not found)
+		if exitCode != 0 || !strings.Contains(stdout, podName) {
+			return true
+		}
+		// Pod is terminating
+		if strings.Contains(stdout, "Terminating") {
+			return true
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return false
+}
+
 // cleanupTestResources removes test resources
 func (e *testEnv) cleanupTestResources() {
 	e.t.Helper()
@@ -354,8 +402,8 @@ func TestIntegration_Direct_DescribePod(t *testing.T) {
 	if !strings.Contains(stdout, "test-pod") {
 		t.Errorf("Expected output to contain 'test-pod', got: %s", stdout)
 	}
-	if !strings.Contains(stdout, "nginx") {
-		t.Errorf("Expected output to contain 'nginx', got: %s", stdout)
+	if !strings.Contains(stdout, "busybox") {
+		t.Errorf("Expected output to contain 'busybox', got: %s", stdout)
 	}
 }
 
@@ -834,7 +882,7 @@ func TestIntegration_E2E_DeleteBlocked_ThenKubectlWorks(t *testing.T) {
 	env := getTestEnv(t)
 	podName := "e2e-delete-test"
 
-	// 1. Create a pod with kubectl
+	// 1. Create a pod with kubectl (using sleep to keep it running)
 	_, err := env.kubectl("apply", "-f", "-", "--input", fmt.Sprintf(`
 apiVersion: v1
 kind: Pod
@@ -843,16 +891,19 @@ metadata:
   namespace: %s
 spec:
   containers:
-  - name: nginx
-    image: nginx:alpine
-  restartPolicy: Never
+  - name: busybox
+    image: busybox:stable
+    command: ["sleep", "3600"]
+  restartPolicy: Always
 `, podName, testNamespace))
 	if err != nil {
 		t.Fatalf("Failed to create test pod: %v", err)
 	}
 
-	// Wait for pod to exist
-	time.Sleep(1 * time.Second)
+	// Wait for pod to exist and be running
+	if !env.waitForPodExists(podName, testNamespace, 30*time.Second) {
+		t.Fatalf("Pod should exist after creation")
+	}
 
 	// Verify pod exists
 	stdout, _, exitCode := env.runDirect("get", "pod", podName, "-n", testNamespace)
@@ -890,12 +941,9 @@ spec:
 		t.Errorf("kubectl delete should have worked: %v", err)
 	}
 
-	// 6. Verify pod is gone (or terminating/completed)
-	time.Sleep(1 * time.Second)
-	stdout, _, _ = env.runDirect("get", "pod", podName, "-n", testNamespace)
-	// Pod should be gone, in Terminating state, or Completed (restartPolicy: Never)
-	if strings.Contains(stdout, podName) && !strings.Contains(stdout, "Terminating") && !strings.Contains(stdout, "Completed") {
-		t.Errorf("Pod should be deleted, terminating, or completed, got: %s", stdout)
+	// 6. Verify pod is gone (or terminating)
+	if !env.waitForPodGone(podName, testNamespace, 30*time.Second) {
+		t.Errorf("Pod should be deleted or terminating within timeout")
 	}
 }
 
@@ -906,12 +954,8 @@ func TestIntegration_E2E_ExecBlocked_ThenKubectlWorks(t *testing.T) {
 	env := getTestEnv(t)
 
 	// Wait for test-pod to be ready
-	for i := 0; i < 30; i++ {
-		stdout, _, _ := env.runDirect("get", "pod", "test-pod", "-n", testNamespace, "-o", "jsonpath={.status.phase}")
-		if strings.Contains(stdout, "Running") {
-			break
-		}
-		time.Sleep(1 * time.Second)
+	if !env.waitForPodRunning("test-pod", testNamespace, 60*time.Second) {
+		t.Skip("test-pod did not reach Running state, skipping exec test")
 	}
 
 	// 1. Try exec with kubectl-readonly (should be blocked)
