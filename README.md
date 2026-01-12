@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/github/go-mod-go-version/Evaneos/kubectl-readonly)](https://go.dev/)
 
-A safe kubectl wrapper that only allows read-only commands. Ideal for giving AI assistants (like Claude) unrestricted access to explore Kubernetes clusters, including production, without risk of accidental modifications.
+A kubectl wrapper that only allows read-only commands. Designed to prevent accidental modifications when AI assistants (like Claude) explore Kubernetes clusters, including production.
 
 ## Requirements
 
@@ -189,7 +189,7 @@ Tell Claude to prefer `kubectl-readonly` for read-only operations.
 ```markdown
 # Kubernetes
 
-When exploring Kubernetes clusters, always use `kubectl-readonly` instead of `kubectl` for read-only operations (get, describe, logs, top, etc.). This command is pre-approved and safe for production.
+When exploring Kubernetes clusters, always use `kubectl-readonly` instead of `kubectl` for read-only operations (get, describe, logs, top, etc.). This command is pre-approved and prevents accidental modifications.
 
 Only use `kubectl` directly for write operations (create, apply, delete, exec, etc.) which require explicit approval.
 ```
@@ -200,9 +200,22 @@ Only use `kubectl` directly for write operations (create, apply, delete, exec, e
 
 Claude can then run any read-only kubectl command without asking for permission, while dangerous commands like `delete`, `apply`, or `exec` will be blocked.
 
-## Philosophy
+## Philosophy & Limitations
 
-**When in doubt, block.** This tool prefers false negatives (blocking safe commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+**When in doubt, block.** This tool prefers false negatives (blocking legitimate commands) over false positives (allowing dangerous commands). If a command isn't explicitly in the allowlist, it's blocked.
+
+### What this tool protects against
+
+- **Accidental destructive operations**: An AI agent running `kubectl delete` when it meant `kubectl get`, forgetting `--dry-run` on an apply, or running `kubectl exec` to "quickly check something"
+- **Human errors**: Muscle memory typing the wrong command in a production context
+
+### What this tool does NOT protect against
+
+- **A compromised environment**: If an attacker can modify environment variables and create files, they can bypass this tool via PATH hijacking or [KUBECONFIG exec plugins](https://github.com/fluxcd/flux2/security/advisories/GHSA-vvmq-fwmg-2gjc)
+- **Malicious intent**: This tool is not designed to stop a determined attacker or a malicious AI actively trying to bypass restrictions
+- **Parser edge cases**: We cannot guarantee 100% that the argument parser cannot be abused with shell tricks or special characters
+
+In short: this tool prevents *accidents*, not *attacks*. If you need to secure kubectl against a hostile environment, additional measures (sandboxing, network policies, RBAC) are required.
 
 ## Releases
 

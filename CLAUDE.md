@@ -14,10 +14,10 @@ kubectl-readonly top nodes
 ### Why?
 
 - `kubectl-readonly` is pre-approved in the allowlist - no user confirmation needed
-- It only allows safe, read-only commands (get, describe, logs, top, etc.)
-- Dangerous commands (delete, apply, exec, etc.) are blocked automatically
+- It only allows read-only commands (get, describe, logs, top, etc.)
+- Destructive commands (delete, apply, exec, etc.) are blocked, preventing accidental modifications
 - Secret values are protected (you can list secrets but not see their contents)
-- Safe to use on production clusters
+- Suitable for production clusters exploration
 
 ### When to use `kubectl` instead
 

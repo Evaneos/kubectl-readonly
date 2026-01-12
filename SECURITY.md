@@ -49,4 +49,6 @@ kubectl-readonly is designed with a **"deny by default"** philosophy:
 - No shell interpretation of arguments (prevents injection)
 - Control characters in arguments are blocked
 
-For more details, see the [Philosophy section](README.md#philosophy) in the README.
+**Important**: This tool prevents *accidental* destructive operations, not *malicious* attacks. It does not protect against a compromised environment (PATH hijacking, malicious KUBECONFIG, etc.).
+
+For more details, see the [Philosophy & Limitations section](README.md#philosophy--limitations) in the README.

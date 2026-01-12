@@ -1,4 +1,5 @@
-// kubectl-readonly is a safe kubectl wrapper that only allows read-only commands.
+// kubectl-readonly is a kubectl wrapper that only allows read-only commands.
+// It prevents accidental modifications but does not protect against malicious intent.
 package main
 
 import (
@@ -93,7 +94,7 @@ func execKubectl(args []string) int {
 }
 
 func printHelp() {
-	fmt.Print(`kubectl-readonly - A safe kubectl wrapper that only allows read-only commands
+	fmt.Print(`kubectl-readonly - A kubectl wrapper that only allows read-only commands
 
 USAGE:
     kubectl-readonly [kubectl args...]
