@@ -39,21 +39,21 @@ go install github.com/Evaneos/kubectl-readonly@latest
 
 ## Usage
 
-Use `kubectl readonly` (as a plugin) or `kubectl-readonly` (standalone) exactly like `kubectl`:
+Use `kubectl-readonly` (standalone) exactly like `kubectl`. If the binary is in your PATH, it also works as a kubectl plugin (`kubectl readonly`):
 
 ```bash
-# As a kubectl plugin
-kubectl readonly get pods
-kubectl readonly describe deployment nginx
-kubectl readonly logs my-pod -f
-
-# Or standalone
+# Standalone
 kubectl-readonly get pods
 kubectl-readonly get pods -n kube-system -o wide
 kubectl-readonly describe deployment nginx
 kubectl-readonly logs my-pod -f --tail=100
 kubectl-readonly top nodes
 kubectl-readonly config use-context production
+
+# As a kubectl plugin (if binary is in PATH)
+kubectl readonly get pods
+kubectl readonly describe deployment nginx
+kubectl readonly logs my-pod -f
 ```
 
 If you try a command that's not read-only, it will be blocked:
