@@ -13,21 +13,9 @@ A kubectl wrapper that only allows read-only commands. Designed to prevent accid
 
 ## Installation
 
-### Via Krew (recommended)
+### Via Krew
 
-If you have [Krew](https://krew.sigs.k8s.io/) installed:
-
-```bash
-kubectl krew install readonly
-```
-
-Then use it as a kubectl plugin:
-
-```bash
-kubectl readonly get pods
-kubectl readonly describe deployment nginx
-kubectl readonly logs my-pod -f
-```
+Installation via `kubectl krew install readonly` is not yet available (submission pending).
 
 ### From binary
 
