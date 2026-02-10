@@ -189,6 +189,9 @@ func TestSmoke_Direct_SafeCommands(t *testing.T) {
 		{"auth", "whoami"},
 		{"rollout", "status", "deployment/nginx"},
 		{"rollout", "history", "deployment/nginx"},
+		{"kustomize", "."},
+		{"kustomize", "/path/to/dir"},
+		{"kustomize", "--load-restrictor=LoadRestrictionsRootOnly", "."},
 	}
 
 	for _, args := range safeCommands {
@@ -237,6 +240,10 @@ func TestSmoke_Direct_DangerousCommands(t *testing.T) {
 		{"config", "delete-context", "my-context"},
 		{"config", "unset", "current-context"},
 		{"auth", "reconcile", "-f", "rbac.yaml"},
+		{"kustomize", "--enable-helm", "."},
+		{"kustomize", "--enable-alpha-plugins", "."},
+		{"kustomize", "--network", "."},
+		{"kustomize", "--load-restrictor=None", "."},
 	}
 
 	for _, args := range dangerousCommands {
@@ -498,5 +505,49 @@ func TestSmoke_HelpFlag(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "kubectl readonly") {
 		t.Errorf("Expected plugin mode mention in help, got: %s", out)
+	}
+}
+
+// =============================================================================
+// Smoke Tests - Kustomize Restrictions
+// =============================================================================
+
+func TestSmoke_Direct_KustomizeRestrictions(t *testing.T) {
+	env := setupSmokeEnv(t)
+
+	allowed := [][]string{
+		{"kustomize", "."},
+		{"kustomize", "/some/path"},
+		{"kustomize", "--load-restrictor=LoadRestrictionsRootOnly", "."},
+		{"kustomize", "--load-restrictor", "LoadRestrictionsRootOnly", "."},
+	}
+
+	for _, args := range allowed {
+		name := "allowed_" + strings.Join(args, "_")
+		t.Run(name, func(t *testing.T) {
+			env.t = t
+			env.assertAllowed("direct", args)
+		})
+	}
+
+	blocked := [][]string{
+		{"kustomize", "--enable-alpha-plugins", "."},
+		{"kustomize", "--enable-helm", "."},
+		{"kustomize", "--network", "."},
+		{"kustomize", "--enable-helm=true", "."},
+		{"kustomize", "--network=true", "."},
+		{"kustomize", "--load-restrictor=None", "."},
+		{"kustomize", "--load-restrictor", "None", "."},
+		{"kustomize", "--load-restrictor=LoadRestrictionsNone", "."},
+		{"kustomize", "--load-restrictor", "LoadRestrictionsNone", "."},
+		{"kustomize", ".", "--enable-helm"},
+	}
+
+	for _, args := range blocked {
+		name := "blocked_" + strings.Join(args, "_")
+		t.Run(name, func(t *testing.T) {
+			env.t = t
+			env.assertBlocked("direct", args)
+		})
 	}
 }

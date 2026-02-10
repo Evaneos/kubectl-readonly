@@ -117,13 +117,22 @@ SPECIAL FLAGS (for the wrapper, not passed to kubectl):
 ALLOWED COMMANDS:
     Simple commands (no subcommand needed):
         get, describe, logs, top, explain, api-resources, api-versions,
-        cluster-info, version, events, wait, diff
+        cluster-info, version, events, wait, diff, kustomize
 
     Commands with specific subcommands:
         config view, config get-contexts, config current-context,
         config use-context
         auth can-i, auth whoami
         rollout status, rollout history
+
+KUSTOMIZE RESTRICTIONS:
+    The kustomize command is allowed for local manifest rendering, but
+    the following flags are blocked (they enable code execution, network
+    access, or unrestricted file reads):
+        --enable-alpha-plugins    Executes arbitrary local binaries
+        --enable-helm             Invokes helm (may fetch remote charts)
+        --network                 Enables network access for functions
+        --load-restrictor=None    Allows reading files outside root
 
 SECRETS PROTECTION:
     You can list secrets (metadata) but not view their values:
@@ -164,6 +173,7 @@ var safeCommands = map[string]bool{
 	"events":        true,
 	"wait":          true,
 	"diff":          true,
+	"kustomize":     true,
 }
 
 // Commands with allowed subcommands
@@ -258,6 +268,13 @@ func isCommandAllowed(args []string) (bool, string) {
 		// Check --raw access to secrets
 		if containsRawSecretsAccess(args) {
 			return false, "Access to secrets via --raw is not allowed (exposes secret values)"
+		}
+
+		// Check kustomize-specific blocked flags
+		if command == "kustomize" {
+			if blocked, reason := containsBlockedKustomizeFlags(args); blocked {
+				return false, reason
+			}
 		}
 
 		return true, ""
@@ -426,6 +443,42 @@ func containsRawSecretsAccess(args []string) bool {
 	return strings.Contains(rawLower, "/secrets") ||
 		strings.Contains(rawLower, "/secret/") ||
 		strings.Contains(rawLower, "secrets/")
+}
+
+// Flags blocked for the kustomize command.
+// kustomize is a local build tool (no cluster interaction), but these flags
+// enable code execution, network access, or unrestricted file reads — actions
+// that should require explicit user approval via kubectl directly.
+var kustomizeBlockedFlags = map[string]bool{
+	"--enable-alpha-plugins": true,
+	"--enable-helm":          true,
+	"--network":              true,
+}
+
+func containsBlockedKustomizeFlags(args []string) (bool, string) {
+	for i, arg := range args {
+		// Exact match: --enable-helm, --network
+		if kustomizeBlockedFlags[arg] {
+			return true, fmt.Sprintf("Flag '%s' is not allowed with kustomize in read-only mode", arg)
+		}
+		// Boolean flag with =true: --enable-helm=true, --network=true
+		for flag := range kustomizeBlockedFlags {
+			if strings.HasPrefix(arg, flag+"=") {
+				return true, fmt.Sprintf("Flag '%s' is not allowed with kustomize in read-only mode", flag)
+			}
+		}
+		// --load-restrictor with non-default value
+		if arg == "--load-restrictor" && i+1 < len(args) && args[i+1] != "LoadRestrictionsRootOnly" {
+			return true, "Flag '--load-restrictor' with non-default value is not allowed with kustomize in read-only mode"
+		}
+		if strings.HasPrefix(arg, "--load-restrictor=") {
+			val := arg[len("--load-restrictor="):]
+			if val != "LoadRestrictionsRootOnly" {
+				return true, "Flag '--load-restrictor' with non-default value is not allowed with kustomize in read-only mode"
+			}
+		}
+	}
+	return false, ""
 }
 
 func containsControlCharacters(args []string) bool {
