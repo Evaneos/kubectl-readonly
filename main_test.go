@@ -42,6 +42,7 @@ func TestSafeCommands(t *testing.T) {
 	safeCommandsList := []string{
 		"get", "describe", "logs", "top", "explain",
 		"api-resources", "api-versions", "cluster-info", "version", "events", "wait", "diff",
+		"kustomize",
 	}
 
 	for _, cmd := range safeCommandsList {
@@ -1086,4 +1087,81 @@ func TestContainsRawSecretsAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// Kustomize Command Tests
+// =============================================================================
+
+func TestKustomizeAllowed(t *testing.T) {
+	tests := [][]string{
+		{"kustomize", "."},
+		{"kustomize", "/path/to/dir"},
+		{"kustomize", "https://github.com/org/repo//path"},
+		{"kustomize"},
+		{"kustomize", "--load-restrictor=LoadRestrictionsRootOnly", "."},
+		{"kustomize", "--load-restrictor", "LoadRestrictionsRootOnly", "."},
+		{"-n", "default", "kustomize", "."},
+		{"--context=prod", "kustomize", "/path"},
+	}
+
+	for _, args := range tests {
+		name := strings.Join(args, "_")
+		t.Run(name, func(t *testing.T) {
+			assertAllowed(t, args)
+		})
+	}
+}
+
+func TestKustomizeBlockedFlags(t *testing.T) {
+	tests := []struct {
+		args   []string
+		substr string
+	}{
+		{[]string{"kustomize", "--enable-alpha-plugins", "."}, "--enable-alpha-plugins"},
+		{[]string{"kustomize", "--enable-helm", "."}, "--enable-helm"},
+		{[]string{"kustomize", "--network", "."}, "--network"},
+		{[]string{"kustomize", "--load-restrictor=None", "."}, "--load-restrictor"},
+		{[]string{"kustomize", "--load-restrictor", "None", "."}, "--load-restrictor"},
+		{[]string{"kustomize", "--load-restrictor", "LoadRestrictionsNone", "."}, "--load-restrictor"},
+		{[]string{"kustomize", "--load-restrictor=LoadRestrictionsNone", "."}, "--load-restrictor"},
+	}
+
+	for _, tt := range tests {
+		name := strings.Join(tt.args, "_")
+		t.Run(name, func(t *testing.T) {
+			assertBlockedContains(t, tt.args, tt.substr)
+		})
+	}
+}
+
+func TestKustomizeBlockedFlagVariations(t *testing.T) {
+	tests := [][]string{
+		{"kustomize", "--enable-alpha-plugins=true", "."},
+		{"kustomize", "--enable-helm=true", "."},
+		{"kustomize", "--network=true", "."},
+		{"kustomize", "--enable-helm=false", "."},
+		{"kustomize", ".", "--enable-helm"},
+		{"kustomize", ".", "--network"},
+		{"kustomize", ".", "--enable-alpha-plugins"},
+	}
+
+	for _, args := range tests {
+		name := strings.Join(args, "_")
+		t.Run(name, func(t *testing.T) {
+			assertBlocked(t, args)
+		})
+	}
+}
+
+func TestKustomizeLoadRestrictorDefault(t *testing.T) {
+	// Default value is allowed
+	assertAllowed(t, []string{"kustomize", "--load-restrictor=LoadRestrictionsRootOnly", "."})
+	assertAllowed(t, []string{"kustomize", "--load-restrictor", "LoadRestrictionsRootOnly", "."})
+
+	// Non-default values are blocked
+	assertBlocked(t, []string{"kustomize", "--load-restrictor=None", "."})
+	assertBlocked(t, []string{"kustomize", "--load-restrictor", "None", "."})
+	assertBlocked(t, []string{"kustomize", "--load-restrictor=LoadRestrictionsNone", "."})
+	assertBlocked(t, []string{"kustomize", "--load-restrictor", "LoadRestrictionsNone", "."})
 }
