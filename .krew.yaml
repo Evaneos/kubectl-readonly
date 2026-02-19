@@ -1,0 +1,57 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: readonly
+spec:
+  version: {{ .TagName }}
+  homepage: https://github.com/Evaneos/kubectl-readonly
+  shortDescription: Guardrail against accidental cluster changes
+  description: |
+    A kubectl wrapper that prevents accidental modifications. Allowed commands
+    are passed through to kubectl in your PATH.
+
+    Designed to guard against human errors and AI assistants overstepping their
+    instructions. Also provides basic protection against leaking secret values
+    to LLM context. Does NOT protect against deliberate bypass attempts.
+
+    Examples:
+    - Allowed: get pods, describe deploy, logs, top nodes
+    - Blocked: delete pod, apply -f, exec, scale
+    - Secrets: list allowed, but -o yaml/-o json blocked
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_linux_amd64.tar.gz" .TagName}}
+    bin: kubectl-readonly
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_linux_arm64.tar.gz" .TagName}}
+    bin: kubectl-readonly
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_darwin_amd64.tar.gz" .TagName}}
+    bin: kubectl-readonly
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_darwin_arm64.tar.gz" .TagName}}
+    bin: kubectl-readonly
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_windows_amd64.zip" .TagName}}
+    bin: kubectl-readonly.exe
+  - selector:
+      matchLabels:
+        os: windows
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly_{{ slice .TagName 1 }}_windows_arm64.zip" .TagName}}
+    bin: kubectl-readonly.exe
