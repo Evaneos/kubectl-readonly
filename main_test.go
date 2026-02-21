@@ -174,6 +174,14 @@ func TestSecretsMetadataAllowed(t *testing.T) {
 		{"get", "SECRETS"},
 		{"get", "Secret"},
 		{"get", "Secrets"},
+		// API group qualified resource types (metadata only)
+		{"get", "secret.v1"},
+		{"get", "secrets.v1"},
+		{"get", "secret.core"},
+		{"get", "secret.v1.core"},
+		{"get", "secrets.v1.core"},
+		{"get", "secret.v1", "-o", "name"},
+		{"get", "secret.v1", "-o", "wide"},
 	}
 
 	for _, args := range tests {
@@ -214,6 +222,16 @@ func TestSecretsValuesBlocked(t *testing.T) {
 		{"get", "secrets", "-o", "custom-columns=DATA:.data"},
 		{"get", "secret", "my-secret", "-o", "custom-columns=NAME:.metadata.name,DATA:.data"},
 		{"get", "secrets", "-o", "custom-columns-file=columns.txt"},
+		// API group qualified resource types
+		{"get", "secret.v1", "-o", "yaml"},
+		{"get", "secrets.v1", "-o", "json"},
+		{"get", "secret.core", "-o", "yaml"},
+		{"get", "secret.v1.core", "-o", "yaml"},
+		{"get", "secrets.v1.core", "-o", "json"},
+		{"get", "secret.v1/my-secret", "-o", "yaml"},
+		// Comma-separated with API group qualifiers
+		{"get", "pods,secret.v1", "-o", "yaml"},
+		{"get", "secret.core,configmaps", "-o", "json"},
 	}
 
 	for _, args := range tests {
@@ -302,6 +320,11 @@ func TestSecretsBypassAttempts(t *testing.T) {
 		{"get", "secret/my-secret", "-o", "yaml"},
 		{"get", "secret/my-secret", "-o", "json"},
 		{"get", "secret/a", "secret/b", "-o", "yaml"},
+		// API group qualified bypass attempts
+		{"get", "secret.v1", "-o", "yaml"},
+		{"get", "secret.core", "-o", "json"},
+		{"get", "secret.v1.core", "-o", "yaml"},
+		{"get", "secret.v1/my-secret", "-o", "yaml"},
 	}
 
 	for _, args := range blockedTests {
@@ -980,6 +1003,13 @@ func TestExtractResourceTypes(t *testing.T) {
 		{[]string{"get", "secret/my-secret"}, []string{"secret"}},
 		{[]string{"-n", "default", "get", "pods"}, []string{"pods"}},
 		{[]string{"delete", "pods"}, nil}, // delete is not in extract list
+		// API group qualifiers are stripped to base resource type
+		{[]string{"get", "secret.v1"}, []string{"secret"}},
+		{[]string{"get", "secrets.v1"}, []string{"secrets"}},
+		{[]string{"get", "secret.core"}, []string{"secret"}},
+		{[]string{"get", "secret.v1.core"}, []string{"secret"}},
+		{[]string{"get", "secret.v1/my-secret"}, []string{"secret"}},
+		{[]string{"get", "pods.v1,secret.core"}, []string{"pods", "secret"}},
 	}
 
 	for _, tt := range tests {
