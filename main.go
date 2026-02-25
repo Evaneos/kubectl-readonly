@@ -365,11 +365,15 @@ func extractResourceTypes(args []string) []string {
 			continue
 		}
 
-		// Parse resource types (handles comma-separated and type/name format)
+		// Parse resource types (handles comma-separated, type/name, and type.group formats)
 		for _, part := range strings.Split(arg, ",") {
 			resourceType := part
 			if idx := strings.Index(part, "/"); idx != -1 {
 				resourceType = part[:idx]
+			}
+			// Strip API group qualifiers (e.g., secret.v1, secret.v1.core, secrets.core)
+			if idx := strings.Index(resourceType, "."); idx != -1 {
+				resourceType = resourceType[:idx]
 			}
 			resourceType = strings.ToLower(resourceType)
 			if resourceType != "" && !strings.HasPrefix(resourceType, "-") {
