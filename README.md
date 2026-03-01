@@ -76,7 +76,8 @@ If you try a command that's not read-only, it will be blocked:
 $ kubectl-readonly delete pod my-pod
 This command is not safe for read-only access; use kubectl directly instead.
 
-Reason: Command 'delete' is not in the read-only allowlist
+kubectl-readonly only allows read-only commands without side effects.
+For a list of allowed commands, see: kubectl-readonly --help
 ```
 
 ### Check mode
@@ -88,7 +89,7 @@ $ kubectl-readonly --readonly-check-ok get pods
 OK: This command is allowed by kubectl-readonly
 
 $ kubectl-readonly --readonly-check-ok delete pod my-pod
-BLOCKED: Command 'delete' is not in the read-only allowlist
+BLOCKED: This command is not allowed in read-only mode
 ```
 
 ## Allowed Commands
@@ -109,14 +110,27 @@ BLOCKED: Command 'delete' is not in the read-only allowlist
 | `events` | View cluster events |
 | `wait` | Wait for a condition |
 | `diff` | Show differences without applying |
+| `kustomize` | Render kustomize manifests locally (restricted, see below) |
 
 ### Commands with specific subcommands
 
 | Command | Allowed subcommands |
 |---------|---------------------|
-| `config` | `view`, `get-contexts`, `current-context`, `use-context` |
+| `config` | `view`, `get-contexts`, `get-clusters`, `get-users`, `current-context`, `use-context` |
 | `auth` | `can-i`, `whoami` |
 | `rollout` | `status`, `history` |
+| `krew` | `list`, `search`, `info` |
+
+## Kustomize Restrictions
+
+The `kustomize` command is allowed for local manifest rendering, but the following flags are blocked because they enable code execution, network access, or unrestricted file reads:
+
+| Blocked flag | Risk |
+|---|---|
+| `--enable-alpha-plugins` | Executes arbitrary local binaries |
+| `--enable-helm` | Invokes helm (may fetch remote charts) |
+| `--network` | Enables network access for functions |
+| `--load-restrictor=None` | Allows reading files outside the kustomization root |
 
 ## Secrets Protection
 

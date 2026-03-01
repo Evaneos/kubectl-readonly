@@ -13,3 +13,6 @@ coverage.out
 
 # OS
 .DS_Store
+
+# Implementation plans (local only)
+docs/plans/
