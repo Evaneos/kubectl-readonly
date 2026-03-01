@@ -9,14 +9,16 @@ import (
 
 func assertAllowed(t *testing.T, args []string) {
 	t.Helper()
-	if !kubepolicy.Check(args) {
+	allowed, _ := kubepolicy.Check(args)
+	if !allowed {
 		t.Errorf("expected allowed, got blocked (args: %v)", args)
 	}
 }
 
 func assertBlocked(t *testing.T, args []string) {
 	t.Helper()
-	if kubepolicy.Check(args) {
+	allowed, _ := kubepolicy.Check(args)
+	if allowed {
 		t.Errorf("expected blocked, got allowed (args: %v)", args)
 	}
 }
@@ -614,7 +616,7 @@ func TestSubcommandPositionConfusion(t *testing.T) {
 		t.Run(name, func(_ *testing.T) {
 			// These should be blocked because the actual subcommand parsed is dangerous
 			// or the command structure is invalid
-			_ = kubepolicy.Check(args) // Ensure no panic
+			_, _ = kubepolicy.Check(args) // Ensure no panic
 		})
 	}
 }

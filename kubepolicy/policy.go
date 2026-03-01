@@ -1,5 +1,20 @@
 package kubepolicy
 
+import (
+	"slices"
+	"strings"
+)
+
+// joinSorted returns the sorted keys of m joined with ", ".
+func joinSorted(m map[string]bool) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return strings.Join(keys, ", ")
+}
+
 // safeCommands are kubectl commands allowed without subcommand validation.
 var safeCommands = map[string]bool{
 	"get":           true,

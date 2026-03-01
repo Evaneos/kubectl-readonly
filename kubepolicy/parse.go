@@ -146,26 +146,27 @@ func containsRawSecretsAccess(args []string) bool {
 		strings.Contains(rawLower, "secrets/")
 }
 
-func containsBlockedKustomizeFlags(args []string) bool {
+// blockedKustomizeFlag returns the name of the first blocked flag, or "" if none.
+func blockedKustomizeFlag(args []string) string {
 	for i, arg := range args {
 		if kustomizeBlockedFlags[arg] {
-			return true // deny: blocked kustomize flag
+			return arg
 		}
 		for flag := range kustomizeBlockedFlags {
 			if strings.HasPrefix(arg, flag+"=") {
-				return true // deny: blocked kustomize flag with value
+				return flag
 			}
 		}
 		// --load-restrictor with non-default value
 		if arg == "--load-restrictor" && i+1 < len(args) && args[i+1] != "LoadRestrictionsRootOnly" {
-			return true // deny: non-default load restrictor
+			return "--load-restrictor"
 		}
 		if strings.HasPrefix(arg, "--load-restrictor=") {
 			val := arg[len("--load-restrictor="):]
 			if val != "LoadRestrictionsRootOnly" {
-				return true // deny: non-default load restrictor
+				return "--load-restrictor"
 			}
 		}
 	}
-	return false
+	return ""
 }

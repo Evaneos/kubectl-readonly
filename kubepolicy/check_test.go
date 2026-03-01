@@ -7,15 +7,41 @@ import (
 
 func assertAllowed(t *testing.T, args []string) {
 	t.Helper()
-	if !Check(args) {
+	allowed, _ := Check(args)
+	if !allowed {
 		t.Errorf("expected allowed, got blocked (args: %v)", args)
 	}
 }
 
 func assertBlocked(t *testing.T, args []string) {
 	t.Helper()
-	if Check(args) {
+	allowed, _ := Check(args)
+	if allowed {
 		t.Errorf("expected blocked, got allowed (args: %v)", args)
+	}
+}
+
+func assertHintContains(t *testing.T, args []string, want string) {
+	t.Helper()
+	allowed, hint := Check(args)
+	if allowed {
+		t.Errorf("expected blocked, got allowed (args: %v)", args)
+		return
+	}
+	if !strings.Contains(hint, want) {
+		t.Errorf("hint %q should contain %q (args: %v)", hint, want, args)
+	}
+}
+
+func assertNoHint(t *testing.T, args []string) {
+	t.Helper()
+	allowed, hint := Check(args)
+	if allowed {
+		t.Errorf("expected blocked, got allowed (args: %v)", args)
+		return
+	}
+	if hint != "" {
+		t.Errorf("expected empty hint, got %q (args: %v)", hint, args)
 	}
 }
 
@@ -923,4 +949,42 @@ func TestContainsRawSecretsAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// Hint Tests
+// =============================================================================
+
+func TestHintSecretFormat(t *testing.T) {
+	assertHintContains(t, []string{"get", "secrets", "-o", "yaml"}, "-o name")
+	assertHintContains(t, []string{"get", "secrets", "-o", "json"}, "-o wide")
+	assertHintContains(t, []string{"get", "secret", "my-secret", "-o", "jsonpath={.data}"}, "-o name")
+}
+
+func TestHintRawSecrets(t *testing.T) {
+	assertHintContains(t, []string{"get", "--raw", "/api/v1/secrets"}, "--raw")
+	assertHintContains(t, []string{"get", "--raw=/api/v1/namespaces/default/secrets"}, "--raw")
+}
+
+func TestHintKustomizeFlags(t *testing.T) {
+	assertHintContains(t, []string{"kustomize", "--enable-helm", "."}, "--enable-helm")
+	assertHintContains(t, []string{"kustomize", "--enable-alpha-plugins", "."}, "--enable-alpha-plugins")
+	assertHintContains(t, []string{"kustomize", "--network", "."}, "--network")
+	assertHintContains(t, []string{"kustomize", "--load-restrictor=None", "."}, "--load-restrictor")
+}
+
+func TestHintSubcommands(t *testing.T) {
+	assertHintContains(t, []string{"config"}, "view")
+	assertHintContains(t, []string{"config"}, "current-context")
+	assertHintContains(t, []string{"config", "set-context", "evil"}, "view")
+	assertHintContains(t, []string{"auth"}, "can-i")
+	assertHintContains(t, []string{"rollout", "restart", "deploy/nginx"}, "status")
+	assertHintContains(t, []string{"krew", "install", "ctx"}, "list")
+}
+
+func TestHintEmpty(t *testing.T) {
+	assertNoHint(t, []string{"delete", "pods"})
+	assertNoHint(t, []string{"exec", "pod", "--", "bash"})
+	assertNoHint(t, []string{"apply", "-f", "deploy.yaml"})
+	assertNoHint(t, []string{"get\x00delete", "pods"})
 }

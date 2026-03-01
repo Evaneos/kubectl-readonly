@@ -52,7 +52,7 @@ func run(args []string) int {
 	}
 
 	// Validate the command
-	allowed := kubepolicy.Check(filteredArgs)
+	allowed, hint := kubepolicy.Check(filteredArgs)
 
 	if checkMode {
 		if allowed {
@@ -60,15 +60,18 @@ func run(args []string) int {
 			return 0
 		}
 		fmt.Println("BLOCKED: This command is not allowed in read-only mode")
+		if hint != "" {
+			fmt.Printf("Hint: %s\n", hint)
+		}
 		return 1
 	}
 
 	if !allowed {
-		fmt.Fprint(os.Stderr, `This command is not safe for read-only access; use kubectl directly instead.
-
-kubectl-readonly only allows read-only commands without side effects.
-For a list of allowed commands, see: kubectl-readonly --help
-`)
+		fmt.Fprint(os.Stderr, "This command is not safe for read-only access; use kubectl directly instead.\n")
+		if hint != "" {
+			fmt.Fprintf(os.Stderr, "Hint: %s\n", hint)
+		}
+		fmt.Fprint(os.Stderr, "\nkubectl-readonly only allows read-only commands without side effects.\nFor a list of allowed commands, see: kubectl-readonly --help\n")
 		return 1
 	}
 
