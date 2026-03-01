@@ -182,6 +182,8 @@ func TestSmoke_Direct_SafeCommands(t *testing.T) {
 		{"diff", "-f", "file.yaml"},
 		{"config", "view"},
 		{"config", "get-contexts"},
+		{"config", "get-clusters"},
+		{"config", "get-users"},
 		{"config", "current-context"},
 		{"config", "use-context", "my-context"},
 		{"auth", "can-i", "get", "pods"},
@@ -192,6 +194,10 @@ func TestSmoke_Direct_SafeCommands(t *testing.T) {
 		{"kustomize", "."},
 		{"kustomize", "/path/to/dir"},
 		{"kustomize", "--load-restrictor=LoadRestrictionsRootOnly", "."},
+		{"krew", "list"},
+		{"krew", "search"},
+		{"krew", "search", "ctx"},
+		{"krew", "info", "ctx"},
 	}
 
 	for _, args := range safeCommands {
@@ -244,6 +250,10 @@ func TestSmoke_Direct_DangerousCommands(t *testing.T) {
 		{"kustomize", "--enable-alpha-plugins", "."},
 		{"kustomize", "--network", "."},
 		{"kustomize", "--load-restrictor=None", "."},
+		{"krew", "install", "ctx"},
+		{"krew", "update"},
+		{"krew", "upgrade"},
+		{"krew", "uninstall", "ctx"},
 	}
 
 	for _, args := range dangerousCommands {
@@ -359,6 +369,8 @@ func TestSmoke_Plugin_SafeCommands(t *testing.T) {
 		{"version", "--client"},
 		{"config", "view"},
 		{"config", "get-contexts"},
+		{"config", "get-clusters"},
+		{"config", "get-users"},
 		{"auth", "can-i", "get", "pods"},
 		{"rollout", "status", "deployment/nginx"},
 	}
