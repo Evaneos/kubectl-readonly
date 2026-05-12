@@ -28,7 +28,7 @@ func Check(args []string) (bool, string) {
 	// Safe commands (no subcommand validation needed).
 	if safeCommands[command] {
 		if containsSecretResource(args) {
-			if isSecretExposingFormat(getOutputFormat(args)) {
+			if hasSecretExposingOutput(args) {
 				return false, "use -o name or -o wide to view secret metadata safely"
 			}
 		}

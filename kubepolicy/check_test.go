@@ -216,6 +216,15 @@ func TestSecretsValuesBlocked(t *testing.T) {
 		{"get", "secret.v1/my-secret", "-o", "yaml"},
 		{"get", "pods,secret.v1", "-o", "yaml"},
 		{"get", "secret.core,configmaps", "-o", "json"},
+		// Multiple -o/--output flags: kubectl uses the LAST one,
+		// so any exposing format anywhere in the args must be blocked.
+		{"get", "secrets", "-o", "name", "-o", "yaml"},
+		{"get", "secrets", "-o", "wide", "-o", "json"},
+		{"get", "secrets", "--output", "name", "-o", "yaml"},
+		{"get", "secrets", "-o=name", "--output=yaml"},
+		// Even when the LAST format is safe, kubectl would honour the last
+		// one, but we still block to keep the surface small and predictable.
+		{"get", "secrets", "-o", "yaml", "-o", "name"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
@@ -868,27 +877,63 @@ func TestExtractResourceTypes(t *testing.T) {
 	}
 }
 
-func TestGetOutputFormat(t *testing.T) {
+func TestGetOutputFormats(t *testing.T) {
 	tests := []struct {
-		args   []string
-		format string
+		name    string
+		args    []string
+		formats []string
 	}{
-		{[]string{"get", "pods", "-o", "yaml"}, "yaml"},
-		{[]string{"get", "pods", "-o=yaml"}, "yaml"},
-		{[]string{"get", "pods", "-oyaml"}, "yaml"},
-		{[]string{"get", "pods", "--output", "json"}, "json"},
-		{[]string{"get", "pods", "--output=json"}, "json"},
-		{[]string{"get", "pods"}, ""},
+		{"short", []string{"get", "pods", "-o", "yaml"}, []string{"yaml"}},
+		{"short_eq", []string{"get", "pods", "-o=yaml"}, []string{"yaml"}},
+		{"short_concat", []string{"get", "pods", "-oyaml"}, []string{"yaml"}},
+		{"long", []string{"get", "pods", "--output", "json"}, []string{"json"}},
+		{"long_eq", []string{"get", "pods", "--output=json"}, []string{"json"}},
+		{"none", []string{"get", "pods"}, nil},
+		{"multiple_short", []string{"get", "secrets", "-o", "name", "-o", "yaml"}, []string{"name", "yaml"}},
+		{"multiple_mixed", []string{"get", "secrets", "--output", "name", "-o", "yaml"}, []string{"name", "yaml"}},
+		{"multiple_eq", []string{"get", "secrets", "-o=wide", "--output=json"}, []string{"wide", "json"}},
 	}
 	for _, tt := range tests {
-		name := tt.format
-		if name == "" {
-			name = "empty"
-		}
-		t.Run(name, func(t *testing.T) {
-			got := getOutputFormat(tt.args)
-			if got != tt.format {
-				t.Errorf("got %q, want %q", got, tt.format)
+		t.Run(tt.name, func(t *testing.T) {
+			got := getOutputFormats(tt.args)
+			if len(got) != len(tt.formats) {
+				t.Errorf("got %v, want %v", got, tt.formats)
+				return
+			}
+			for i := range got {
+				if got[i] != tt.formats[i] {
+					t.Errorf("got %v, want %v", got, tt.formats)
+				}
+			}
+		})
+	}
+}
+
+func TestHasSecretExposingOutput(t *testing.T) {
+	exposing := [][]string{
+		{"get", "secrets", "-o", "yaml"},
+		{"get", "secrets", "-o", "name", "-o", "yaml"},
+		{"get", "secrets", "--output", "name", "-o", "yaml"},
+		{"get", "secrets", "-o=wide", "--output=json"},
+		{"get", "secrets", "-o", "yaml", "-o", "name"},
+	}
+	safe := [][]string{
+		{"get", "secrets"},
+		{"get", "secrets", "-o", "name"},
+		{"get", "secrets", "-o", "name", "-o", "wide"},
+		{"get", "secrets", "--output=name"},
+	}
+	for _, args := range exposing {
+		t.Run("exposing_"+strings.Join(args, "_"), func(t *testing.T) {
+			if !hasSecretExposingOutput(args) {
+				t.Errorf("expected exposing output detected: %v", args)
+			}
+		})
+	}
+	for _, args := range safe {
+		t.Run("safe_"+strings.Join(args, "_"), func(t *testing.T) {
+			if hasSecretExposingOutput(args) {
+				t.Errorf("expected no exposing output: %v", args)
 			}
 		})
 	}
