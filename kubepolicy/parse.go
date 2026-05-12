@@ -92,22 +92,35 @@ func containsSecretResource(args []string) bool {
 	return false
 }
 
-func getOutputFormat(args []string) string {
+// getOutputFormats returns every -o/--output value present in args.
+// kubectl honours the LAST occurrence when more than one is given, so checking
+// only the first allowed `-o name -o yaml` to bypass secret protection.
+func getOutputFormats(args []string) []string {
+	var formats []string
 	for i, arg := range args {
-		if (arg == "-o" || arg == "--output") && i+1 < len(args) {
-			return args[i+1]
-		}
-		if strings.HasPrefix(arg, "-o=") {
-			return arg[3:]
-		}
-		if strings.HasPrefix(arg, "--output=") {
-			return arg[9:]
-		}
-		if strings.HasPrefix(arg, "-o") && len(arg) > 2 {
-			return arg[2:]
+		switch {
+		case (arg == "-o" || arg == "--output") && i+1 < len(args):
+			formats = append(formats, args[i+1])
+		case strings.HasPrefix(arg, "-o="):
+			formats = append(formats, arg[3:])
+		case strings.HasPrefix(arg, "--output="):
+			formats = append(formats, arg[9:])
+		case strings.HasPrefix(arg, "-o") && len(arg) > 2:
+			formats = append(formats, arg[2:])
 		}
 	}
-	return ""
+	return formats
+}
+
+// hasSecretExposingOutput reports whether any -o/--output flag in args
+// requests a format that would expose secret values.
+func hasSecretExposingOutput(args []string) bool {
+	for _, f := range getOutputFormats(args) {
+		if isSecretExposingFormat(f) {
+			return true
+		}
+	}
+	return false
 }
 
 func isSecretExposingFormat(format string) bool {
