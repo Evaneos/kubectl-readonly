@@ -819,6 +819,19 @@ func TestDiffCommand(t *testing.T) {
 	}
 }
 
+func TestDiffShowSecretsBlocked(t *testing.T) {
+	assertBlocked(t, []string{"diff", "--show-secrets", "-f", "secret.yaml"})
+	assertBlocked(t, []string{"diff", "--show-secrets=true", "-f", "secret.yaml"})
+	assertBlocked(t, []string{"diff", "--show-secrets=1", "-f", "secret.yaml"})
+	assertBlocked(t, []string{"diff", "--show-secrets=garbage", "-f", "secret.yaml"})
+	assertBlocked(t, []string{"diff", "--show_secrets", "-f", "secret.yaml"})
+	assertHintContains(t, []string{"diff", "--show-secrets", "-f", "secret.yaml"}, "--show-secrets")
+
+	// Masking is on by default and --show-secrets=false keeps it on: both allowed.
+	assertAllowed(t, []string{"diff", "-f", "deployment.yaml"})
+	assertAllowed(t, []string{"diff", "--show-secrets=false", "-f", "secret.yaml"})
+}
+
 func TestCompletionBlocked(t *testing.T) {
 	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
 		t.Run(shell, func(t *testing.T) {
