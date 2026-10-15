@@ -10,32 +10,61 @@ before:
 
 builds:
   - id: kubectl-readonly
+    main: .
     binary: kubectl-readonly
-    env:
+    env: &build-env
       - CGO_ENABLED=0
-    goos:
+    goos: &build-goos
       - linux
       - darwin
       - windows
-    goarch:
+    goarch: &build-goarch
       - amd64
       - arm64
-    ldflags:
+    ldflags: &build-ldflags
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/Evaneos/kubectl-readonly/internal/cli.version={{.Version}}
+      - -X github.com/Evaneos/kubectl-readonly/internal/cli.commit={{.Commit}}
+      - -X github.com/Evaneos/kubectl-readonly/internal/cli.date={{.Date}}
+  - id: kubectl-readonly-strict
+    main: ./cmd/kubectl-readonly-strict
+    binary: kubectl-readonly-strict
+    env: *build-env
+    goos: *build-goos
+    goarch: *build-goarch
+    ldflags: *build-ldflags
+  - id: kubectl-readonly-leaky
+    main: ./cmd/kubectl-readonly-leaky
+    binary: kubectl-readonly-leaky
+    env: *build-env
+    goos: *build-goos
+    goarch: *build-goarch
+    ldflags: *build-ldflags
 
+# One archive per binary: each krew plugin (.krew/*.yaml) points to its own.
 archives:
-  - id: default
-    formats: [tar.gz]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
+  - id: kubectl-readonly
+    ids: [kubectl-readonly]
+    name_template: "kubectl-readonly_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: &archive-formats [tar.gz]
+    format_overrides: &archive-format-overrides
       - goos: windows
         formats: [zip]
-    files:
+    files: &archive-files
       - README.md
       - LICENSE*
+  - id: kubectl-readonly-strict
+    ids: [kubectl-readonly-strict]
+    name_template: "kubectl-readonly-strict_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: *archive-formats
+    format_overrides: *archive-format-overrides
+    files: *archive-files
+  - id: kubectl-readonly-leaky
+    ids: [kubectl-readonly-leaky]
+    name_template: "kubectl-readonly-leaky_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: *archive-formats
+    format_overrides: *archive-format-overrides
+    files: *archive-files
 
 checksum:
   name_template: "checksums.txt"

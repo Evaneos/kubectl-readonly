@@ -31,5 +31,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update krew-index
+      # continue-on-error: one plugin failing (e.g. not yet in krew-index) must
+      # not skip the others; the last step still fails the job.
+      - name: Update krew-index (readonly)
+        id: krew_readonly
+        continue-on-error: true
         uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
+        with:
+          krew_template_file: .krew/readonly.yaml
+      - name: Update krew-index (readonly-strict)
+        id: krew_strict
+        continue-on-error: true
+        uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
+        with:
+          krew_template_file: .krew/readonly-strict.yaml
+      - name: Update krew-index (readonly-leaky)
+        id: krew_leaky
+        continue-on-error: true
+        uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
+        with:
+          krew_template_file: .krew/readonly-leaky.yaml
+
+      - name: Fail if any krew-index update failed
+        if: steps.krew_readonly.outcome == 'failure' || steps.krew_strict.outcome == 'failure' || steps.krew_leaky.outcome == 'failure'
+        run: exit 1

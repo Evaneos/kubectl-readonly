@@ -45,7 +45,8 @@ Out of scope:
 kubectl-readonly is designed with a **"deny by default"** philosophy:
 
 - Only explicitly allowlisted commands can execute
-- Secret values are protected even for read operations
+- Secret values are protected even for read operations (except in the `kubectl-readonly-leaky` profile, which shows them by design)
+- The `kubectl-readonly-strict` profile runs kubectl without `KUBECTL_EXTERNAL_DIFF` and with kuberc disabled
 - No shell interpretation of arguments (prevents injection)
 - Control characters in arguments are blocked
 
