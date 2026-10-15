@@ -63,22 +63,9 @@ var secretResources = map[string]bool{
 	"secrets": true,
 }
 
-// secretExposingFormats are output formats that expose secret values.
-var secretExposingFormats = map[string]bool{
-	"yaml":                true,
-	"json":                true,
-	"jsonpath":            true,
-	"jsonpath-as-json":    true,
-	"jsonpath-file":       true,
-	"go-template":         true,
-	"go-template-file":    true,
-	"template":            true,
-	"templatefile":        true,
-	"custom-columns":      true,
-	"custom-columns-file": true,
-}
-
 // flagsWithValues are kubectl flags that consume the next argument.
+// The global flags are complete as of kubectl 1.37 (`kubectl options`): a missing
+// one makes its value read as the command word. Re-check on kubectl upgrades.
 var flagsWithValues = map[string]bool{
 	"-n": true, "--namespace": true,
 	"--context": true, "--kubeconfig": true,
@@ -88,11 +75,14 @@ var flagsWithValues = map[string]bool{
 	"-v":               true, "--v": true,
 	"--request-timeout": true,
 	"--server":          true, "-s": true,
-	"--token": true, "--user": true, "--cluster": true,
+	"--token": true, "--user": true, "--username": true, "--password": true,
+	"--cluster":               true,
 	"--certificate-authority": true,
 	"--client-certificate":    true, "--client-key": true,
-	"--tls-server-name": true,
-	"--as":              true, "--as-group": true, "--as-uid": true,
+	"--tls-server-name": true, "--proxy-url": true,
+	"--as": true, "--as-group": true, "--as-uid": true, "--as-user-extra": true,
+	"--profile": true, "--profile-output": true,
+	"--vmodule": true, "--log-flush-frequency": true, "--kuberc": true,
 	"--cache-dir": true, "--sort-by": true, "--chunk-size": true,
 	"--template": true,
 	"-f":         true, "--filename": true,

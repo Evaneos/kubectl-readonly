@@ -1,6 +1,7 @@
 package kubepolicy
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -178,6 +179,7 @@ func TestSecretsMetadataAllowed(t *testing.T) {
 		{"get", "secrets.v1.core"},
 		{"get", "secret.v1", "-o", "name"},
 		{"get", "secret.v1", "-o", "wide"},
+		{"get", "secrets", "-o=", "json"}, // -o= is an empty (table) output, not "json"
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
@@ -233,10 +235,110 @@ func TestSecretsRawBlocked(t *testing.T) {
 		{"get", "--raw", "/api/v1/namespaces/default/secrets/my-secret"},
 		{"get", "--raw", "/api/v1/SECRETS"},
 		{"get", "--raw", "/api/v1/Secrets"},
+		// A URL fragment is dropped by client-go, so it must not hide the path.
+		{"get", "--raw", "/api/v1/secrets#x"},
+		{"get", "--raw", "/api/v1/namespaces/default/secrets#?x"},
+		// Percent-encoded path separator, decoded like client-go does.
+		{"get", "--raw", "/api/v1/namespaces/default%2Fsecrets"},
+		// Scheme-relative form still resolves to the secrets path.
+		{"get", "--raw", "//evil/api/v1/secrets"},
+		// Secrets of a namespace that happens to be named "secrets".
+		{"get", "--raw", "/api/v1/namespaces/secrets/secrets"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
 			assertBlocked(t, args)
+		})
+	}
+}
+
+// TestSecretsMultiFlagBypass: kubectl acts on the last -o/--output and on flags
+// hidden in clusters, so no safe-looking flag may vouch for an exposing one.
+func TestSecretsMultiFlagBypass(t *testing.T) {
+	tests := [][]string{
+		// Multiple -o/--output: kubectl honours the last.
+		{"get", "secrets", "-o", "name", "-o", "yaml"},
+		{"get", "secrets", "--output", "name", "-o", "json"},
+		{"get", "secrets", "-o=name", "--output=yaml"},
+		{"get", "secrets", "-o", "yaml", "-o", "name"},
+		// Grouped shorthand clusters that hide -o.
+		{"get", "secrets", "-Aoyaml"},
+		{"get", "secrets", "-Ao", "yaml"},
+		{"get", "secrets", "-Ao=yaml"},
+		{"get", "secrets", "-wo", "json"},
+		// go-template selected by --template, with no -o at all.
+		{"get", "secrets", "--template", "{{range .items}}{{.data.password}}{{end}}"},
+		{"get", "secret", "db", "--template={{.data.password}}"},
+		// KYAML exposes values like yaml/json.
+		{"get", "secrets", "-o", "kyaml"},
+		// Multiple --raw, and percent-encoded secret paths.
+		{"get", "--raw", "/api", "--raw", "/api/v1/namespaces/default/secrets"},
+		{"get", "--raw", "/api/v1/namespaces/default/%73ecrets"},
+		{"get", "--raw", "/api/v1/namespaces/default/secret%73/db"},
+		// -f/-k file + exposing format: the file may name a live secret.
+		{"get", "-f", "secret.yaml", "-o", "yaml"},
+		{"get", "--filename=secret.yaml", "-o", "json"},
+		{"wait", "-f", "secret.yaml", "--for=create", "-o", "json"},
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			assertBlocked(t, args)
+		})
+	}
+}
+
+// TestAllowlistBypassViaValueFlag: every value-taking global flag must be
+// skipped with its value, or its value is read as the command (see flagsWithValues).
+func TestAllowlistBypassViaValueFlag(t *testing.T) {
+	tests := [][]string{
+		{"--profile-output", "get", "delete", "secret", "db"},
+		{"--as-user-extra", "get", "delete", "secret", "db"},
+		{"--profile", "x", "delete", "pods"},
+		{"--proxy-url", "x", "delete", "pods"},
+		{"config", "--profile-output", "view", "set-credentials", "evil", "--token=x"},
+		// kubectl folds "_" to "-" in flag names, so the underscore spelling
+		// consumes its value just the same and must not slip the command word.
+		{"--profile_output", "get", "delete", "secret", "db"},
+		{"--as_group", "x", "delete", "pods"},
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			assertBlocked(t, args)
+		})
+	}
+}
+
+func TestConfigViewCredentialsBlocked(t *testing.T) {
+	assertBlocked(t, []string{"config", "view", "--raw"})
+	assertBlocked(t, []string{"config", "view", "--flatten"})
+	assertBlocked(t, []string{"config", "view", "-o", "yaml", "--raw"})
+	assertBlocked(t, []string{"config", "view", "--raw=true"})
+	assertBlocked(t, []string{"config", "view", "--flatten=true"})
+	assertBlocked(t, []string{"config", "view", "--raw=1"})
+	assertAllowed(t, []string{"config", "view"})
+	assertAllowed(t, []string{"config", "view", "-o", "yaml"})
+	assertAllowed(t, []string{"config", "view", "--minify"})
+	assertAllowed(t, []string{"config", "view", "--raw=false"})
+	assertAllowed(t, []string{"config", "view", "--flatten=false"})
+}
+
+// TestNonSecretOutputAllowed: output formats and templates are unrestricted
+// unless the target is a secret. A -f file is blocked only together with an
+// exposing format; with a safe format (name/wide) it stays allowed.
+func TestNonSecretOutputAllowed(t *testing.T) {
+	tests := [][]string{
+		{"get", "pods", "-o", "yaml"},
+		{"get", "pods", "-Aoyaml"},
+		{"get", "pods", "-o", "name", "-o", "yaml"},
+		{"get", "pods", "--template", "{{.items}}"},
+		{"get", "configmaps", "-o", "kyaml"},
+		{"describe", "-f", "secret.yaml"},         // describe shows sizes, not values
+		{"get", "-f", "pods.yaml", "-o", "name"},  // file with a safe format
+		{"get", "pods", "-A=false", "-o", "yaml"}, // boolean shorthand with a value
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			assertAllowed(t, args)
 		})
 	}
 }
@@ -248,6 +350,7 @@ func TestSecretsRawNonSensitiveAllowed(t *testing.T) {
 		{"get", "--raw", "/api/v1/nodes"},
 		{"get", "--raw", "/healthz"},
 		{"get", "--raw", "/api/v1/configmaps"},
+		{"get", "--raw", "/api/v1/namespaces/secrets/pods"}, // namespace named "secrets"
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
@@ -797,6 +900,9 @@ func TestKustomizeBlockedFlags(t *testing.T) {
 		{"kustomize", ".", "--enable-helm"},
 		{"kustomize", ".", "--network"},
 		{"kustomize", ".", "--enable-alpha-plugins"},
+		// Underscore spellings kubectl accepts (it folds "_" to "-").
+		{"kustomize", "--enable_helm", "."},
+		{"kustomize", "--load_restrictor=LoadRestrictionsNone", "."},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
@@ -868,56 +974,87 @@ func TestExtractResourceTypes(t *testing.T) {
 	}
 }
 
-func TestGetOutputFormat(t *testing.T) {
+func TestNormalizeArgs(t *testing.T) {
 	tests := []struct {
-		args   []string
-		format string
+		name string
+		args []string
+		want []string
 	}{
-		{[]string{"get", "pods", "-o", "yaml"}, "yaml"},
-		{[]string{"get", "pods", "-o=yaml"}, "yaml"},
-		{[]string{"get", "pods", "-oyaml"}, "yaml"},
-		{[]string{"get", "pods", "--output", "json"}, "json"},
-		{[]string{"get", "pods", "--output=json"}, "json"},
-		{[]string{"get", "pods"}, ""},
+		{"short_value_split", []string{"get", "pods", "-o", "yaml"}, []string{"get", "pods", "-o", "yaml"}},
+		{"short_value_concat", []string{"get", "pods", "-oyaml"}, []string{"get", "pods", "-o", "yaml"}},
+		{"short_value_eq", []string{"get", "pods", "-o=yaml"}, []string{"get", "pods", "-o", "yaml"}},
+		{"short_value_eq_empty", []string{"get", "secrets", "-o=", "json"}, []string{"get", "secrets", "-o", "", "json"}},
+		{"cluster_concat", []string{"get", "secrets", "-Aoyaml"}, []string{"get", "secrets", "-A", "-o", "yaml"}},
+		{"cluster_next_arg", []string{"get", "secrets", "-Ao", "yaml"}, []string{"get", "secrets", "-A", "-o", "yaml"}},
+		{"cluster_watch", []string{"get", "secrets", "-wo", "json"}, []string{"get", "secrets", "-w", "-o", "json"}},
+		{"bool_cluster", []string{"get", "pods", "-Aw"}, []string{"get", "pods", "-A", "-w"}},
+		{"long_untouched", []string{"get", "pods", "--output=json"}, []string{"get", "pods", "--output=json"}},
+		{"long_underscore_folded", []string{"--profile_output=x", "get", "pods"}, []string{"--profile-output=x", "get", "pods"}},
+		{"long_underscore_bare", []string{"--profile_output", "x", "get", "pods"}, []string{"--profile-output", "x", "get", "pods"}},
+		{"bool_eq", []string{"get", "pods", "-A=false"}, []string{"get", "pods", "-A=false"}},
+		{"dash_number_untouched", []string{"logs", "pod", "--tail", "-1"}, []string{"logs", "pod", "--tail", "-1"}},
+		{"double_dash_untouched", []string{"get", "pods", "--"}, []string{"get", "pods", "--"}},
 	}
 	for _, tt := range tests {
-		name := tt.format
-		if name == "" {
-			name = "empty"
-		}
-		t.Run(name, func(t *testing.T) {
-			got := getOutputFormat(tt.args)
-			if got != tt.format {
-				t.Errorf("got %q, want %q", got, tt.format)
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeArgs(tt.args)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestIsSecretExposingFormat(t *testing.T) {
-	exposing := []string{
-		"yaml", "json", "jsonpath", "jsonpath={.data}",
-		"jsonpath-as-json", "jsonpath-file",
-		"go-template", "go-template={{.data}}", "go-template-file",
-		"template", "templatefile",
-		"custom-columns", "custom-columns=NAME:.metadata.name", "custom-columns-file",
+func TestOutputFormatsExtraction(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		formats []string
+	}{
+		{"none", []string{"get", "pods"}, nil},
+		{"short", []string{"get", "pods", "-o", "yaml"}, []string{"yaml"}},
+		{"long_eq", []string{"get", "pods", "--output=json"}, []string{"json"}},
+		{"multiple", []string{"get", "secrets", "-o", "name", "-o", "yaml"}, []string{"name", "yaml"}},
+		{"multiple_mixed", []string{"get", "secrets", "--output", "name", "-o", "json"}, []string{"name", "json"}},
 	}
-	safe := []string{"", "name", "wide"}
-	for _, f := range exposing {
-		t.Run("exposing_"+f, func(t *testing.T) {
-			if !isSecretExposingFormat(f) {
-				t.Errorf("%q should be exposing", f)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := outputFormats(normalizeArgs(tt.args))
+			if !slices.Equal(got, tt.formats) {
+				t.Errorf("got %v, want %v", got, tt.formats)
 			}
 		})
 	}
-	for _, f := range safe {
-		name := f
-		if name == "" {
-			name = "empty"
-		}
-		t.Run("safe_"+name, func(t *testing.T) {
-			if isSecretExposingFormat(f) {
-				t.Errorf("%q should be safe", f)
+}
+
+func TestRequestsExposingOutput(t *testing.T) {
+	exposing := [][]string{
+		{"get", "secrets", "-o", "yaml"},
+		{"get", "secrets", "-o", "name", "-o", "yaml"},
+		{"get", "secrets", "-o", "yaml", "-o", "name"},
+		{"get", "secrets", "-o", "kyaml"},
+		{"get", "secrets", "-o", "jsonpath={.data}"},
+		{"get", "secrets", "-o", "custom-columns=DATA:.data"},
+		{"get", "secrets", "--template", "{{.data}}"},
+		{"get", "secrets", "--template={{.data}}"},
+	}
+	safe := [][]string{
+		{"get", "secrets"},
+		{"get", "secrets", "-o", "name"},
+		{"get", "secrets", "-o", "wide"},
+		{"get", "secrets", "-o", "name", "-o", "wide"},
+	}
+	for _, args := range exposing {
+		t.Run("exposing_"+strings.Join(args, "_"), func(t *testing.T) {
+			if !requestsExposingOutput(normalizeArgs(args)) {
+				t.Errorf("expected exposing output: %v", args)
+			}
+		})
+	}
+	for _, args := range safe {
+		t.Run("safe_"+strings.Join(args, "_"), func(t *testing.T) {
+			if requestsExposingOutput(normalizeArgs(args)) {
+				t.Errorf("expected no exposing output: %v", args)
 			}
 		})
 	}
