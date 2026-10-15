@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Go 1.25 or later
+- Go 1.27 or later
 - kubectl (for integration tests)
 - kind and Docker (for full integration tests)
 
@@ -31,7 +31,7 @@ make test-all
 
 ### Test Pyramid
 
-1. **Unit tests** (`main_test.go`): Test the command validation logic directly
+1. **Unit tests** (`kubepolicy/check_test.go`, `main_test.go`): Test the command validation logic directly
 2. **Smoke tests** (`smoke_test.go`): Test the binary with `--readonly-check-ok` flag (fast, no cluster)
 3. **Integration tests** (`integration_test.go`): Test against a real kind cluster
 
@@ -149,16 +149,7 @@ Follow [Semantic Versioning](https://semver.org/):
 
 ### Updating an Existing Krew Plugin
 
-After each new release:
-
-1. **Generate updated manifest**:
-   ```bash
-   make krew-manifest VERSION=v0.4.0 > readonly.yaml
-   ```
-
-2. **Submit a PR to krew-index** updating `plugins/readonly.yaml`:
-   - Title: `Update readonly to v0.4.0`
-   - The PR should only change the version and SHA256 checksums
+The first submission to krew-index is manual. For each later tag, the release workflow runs [krew-release-bot](https://github.com/rajatjindal/krew-release-bot), which opens the krew-index PR for each new tag.
 
 ### Krew Manifest Location
 
