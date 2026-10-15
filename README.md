@@ -3,7 +3,6 @@
 [![CI](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml/badge.svg)](https://github.com/Evaneos/kubectl-readonly/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Evaneos/kubectl-readonly)](https://github.com/Evaneos/kubectl-readonly/releases/latest)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Evaneos/kubectl-readonly.svg)](https://pkg.go.dev/github.com/Evaneos/kubectl-readonly)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Evaneos/kubectl-readonly)](https://goreportcard.com/report/github.com/Evaneos/kubectl-readonly)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Evaneos/kubectl-readonly)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
