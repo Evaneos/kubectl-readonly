@@ -47,6 +47,8 @@ make install
 
 ## Linting
 
+Requires golangci-lint v2.
+
 ```bash
 golangci-lint run ./...
 # or
