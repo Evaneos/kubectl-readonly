@@ -1,6 +1,7 @@
 # Binaries
-kubectl-readonly
-kubectl-readonly-*
+/kubectl-readonly
+/kubectl-readonly-*
+/dist/
 *.exe
 
 # IDE

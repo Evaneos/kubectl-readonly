@@ -10,6 +10,28 @@ A kubectl wrapper that only allows read-only commands. Designed to prevent accid
 
 > **IMPORTANT NOTICE.** While open-sourced, kubectl-readonly is built by LLMs such as Claude Code, with humans directing. The source is open so you can read it before (moderately) trusting it, and it's an anti-footgun tool, not a security boundary: it prevents accidents, not attacks (see [Philosophy & Limitations](#philosophy--limitations)).
 
+## Profiles
+
+kubectl-readonly ships as three binaries. They share one argument parser and
+the same guardrail against writes, `exec` and risky `kustomize` flags; they
+differ on secret values and on the environment kubectl runs with.
+
+| Binary | Krew plugin | Secret values | Environment passed to kubectl |
+|--------|-------------|---------------|-------------------------------|
+| `kubectl-readonly` | `readonly` | masked | inherited |
+| `kubectl-readonly-strict` | `readonly-strict` | masked | sanitized |
+| `kubectl-readonly-leaky` | `readonly-leaky` | **shown** | inherited |
+
+- **`kubectl-readonly`** (moderate) is the default and the one to allowlist for
+  AI assistants.
+- **`kubectl-readonly-strict`** applies the same command policy and runs kubectl
+  without `KUBECTL_EXTERNAL_DIFF`, which makes `kubectl diff` run an arbitrary
+  program, and with kuberc disabled. See [Strict environment](#strict-environment).
+- **`kubectl-readonly-leaky`** drops [secret masking](#secrets-protection):
+  `get secret -o yaml`, `get --raw` on secret paths, `config view --raw` and
+  `diff --show-secrets` print values. Use it when you need to read a secret and
+  still want the write guardrail.
+
 ## Requirements
 
 - `kubectl` must be installed and available in your PATH
@@ -22,6 +44,7 @@ If you have [Krew](https://krew.sigs.k8s.io/) installed:
 
 ```bash
 kubectl krew install readonly
+# or: kubectl krew install readonly-strict / readonly-leaky
 ```
 
 Then use it as a kubectl plugin:
@@ -42,6 +65,8 @@ Requires Go 1.25+:
 
 ```bash
 go install github.com/Evaneos/kubectl-readonly@latest
+go install github.com/Evaneos/kubectl-readonly/cmd/kubectl-readonly-strict@latest
+go install github.com/Evaneos/kubectl-readonly/cmd/kubectl-readonly-leaky@latest
 ```
 
 ### Supported platforms
@@ -135,7 +160,8 @@ The `kustomize` command is allowed for local manifest rendering, but the followi
 
 ## Secrets Protection
 
-`kubectl-readonly` makes a reasonable effort to block the obvious ways secret values reach your terminal or logs, while keeping everyday commands usable.
+This section applies to `kubectl-readonly` and `kubectl-readonly-strict`;
+`kubectl-readonly-leaky` skips it. `kubectl-readonly` makes a reasonable effort to block the obvious ways secret values reach your terminal or logs, while keeping everyday commands usable.
 
 ```bash
 # Allowed - shows secret names, types, and ages (no values)
@@ -162,6 +188,16 @@ Files passed to `-f`/`-k` are opaque to the tool, so it treats them as possible
 secrets: a value-printing format with `-f` is blocked whatever the file
 (`get -f deployment.yaml -o yaml` included), while `-o name` and `-o wide` stay
 allowed.
+
+## Strict environment
+
+`kubectl-readonly-strict` runs kubectl without `KUBECTL_EXTERNAL_DIFF`, which
+makes `kubectl diff` run an arbitrary program, and with `KUBERC=off`, since
+[kuberc](https://kubernetes.io/docs/reference/kubectl/kuberc/) defaults can add
+flags such as `-o yaml` to an allowed command. Every other variable is passed
+through: credential plugins (gcloud, aws, kubelogin), proxies and custom CAs
+keep working. A kubeconfig `exec:` entry still runs its command, and `PATH`
+still decides which `diff` and `kubectl-krew` programs kubectl runs.
 
 ## Long-running commands
 
@@ -256,7 +292,7 @@ git push origin v1.0.0
 ```
 
 Each release includes:
-- Pre-built binaries for all platforms
+- Pre-built binaries for all platforms, one archive per profile
 - SHA256 checksums (`checksums.txt`)
 - Automatically generated changelog
 

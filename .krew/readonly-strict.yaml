@@ -1,0 +1,54 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: readonly-strict
+spec:
+  version: {{ .TagName }}
+  homepage: https://github.com/Evaneos/kubectl-readonly
+  shortDescription: Read-only kubectl wrapper with a sanitized environment
+  description: |
+    The strict profile of kubectl-readonly: the same read-only policy (writes,
+    exec and secret values blocked), and kubectl runs without
+    KUBECTL_EXTERNAL_DIFF (runs a program on kubectl diff) and with kuberc
+    disabled (KUBERC=off).
+    Other variables pass through, so credential plugins and proxies work.
+
+    Designed to guard against human errors and AI assistants overstepping their
+    instructions. Does NOT protect against deliberate bypass attempts.
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_linux_amd64.tar.gz" .TagName}}
+    bin: kubectl-readonly-strict
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_linux_arm64.tar.gz" .TagName}}
+    bin: kubectl-readonly-strict
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_darwin_amd64.tar.gz" .TagName}}
+    bin: kubectl-readonly-strict
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_darwin_arm64.tar.gz" .TagName}}
+    bin: kubectl-readonly-strict
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_windows_amd64.zip" .TagName}}
+    bin: kubectl-readonly-strict.exe
+  - selector:
+      matchLabels:
+        os: windows
+        arch: arm64
+    {{addURIAndSha "https://github.com/Evaneos/kubectl-readonly/releases/download/{{ .TagName }}/kubectl-readonly-strict_{{ slice .TagName 1 }}_windows_arm64.zip" .TagName}}
+    bin: kubectl-readonly-strict.exe

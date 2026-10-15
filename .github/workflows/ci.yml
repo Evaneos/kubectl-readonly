@@ -89,7 +89,7 @@ jobs:
           go-version: "1.27"
 
       - name: Build
-        run: go build -o kubectl-readonly .
+        run: make build
 
       - name: Verify GoReleaser config
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0

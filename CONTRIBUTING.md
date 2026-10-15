@@ -123,6 +123,7 @@ Follow [Semantic Versioning](https://semver.org/):
    ```bash
    # This downloads checksums from the release and generates the manifest
    make krew-manifest VERSION=v0.3.0 > readonly.yaml
+   # Other plugins: make krew-manifest VERSION=v0.3.0 PLUGIN=readonly-strict > readonly-strict.yaml
    ```
 
 3. **Fork and clone krew-index**:
@@ -153,7 +154,7 @@ The first submission to krew-index is manual. For each later tag, the release wo
 
 ### Krew Manifest Location
 
-A template manifest is available at `plugins/readonly.yaml`. The `make krew-manifest` command generates a complete manifest with correct SHA256 checksums from a GitHub release.
+The krew-release-bot templates live in `.krew/`, one per plugin (`readonly`, `readonly-strict`, `readonly-leaky`). The `make krew-manifest` command renders one of them (`PLUGIN=`, default `readonly`) with the SHA256 checksums of a GitHub release.
 
 ---
 

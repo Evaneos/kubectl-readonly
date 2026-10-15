@@ -340,7 +340,11 @@ func (e *testEnv) cleanupTestResources() {
 // Test Setup - Run once for all integration tests
 // =============================================================================
 
-var globalEnv *testEnv
+var (
+	globalEnv *testEnv
+	// wrongContext, once set, fails every test: the context guard must not run only once.
+	wrongContext string
+)
 
 func TestMain(m *testing.M) {
 	// This only runs when integration tag is set
@@ -354,9 +358,17 @@ func TestMain(m *testing.M) {
 
 func getTestEnv(t *testing.T) *testEnv {
 	t.Helper()
+	if wrongContext != "" {
+		t.Fatal(wrongContext)
+	}
 	if globalEnv == nil {
 		globalEnv = setupTestEnv(t)
 		globalEnv.ensureCluster()
+		// The harness runs kubectl on the current context: never let it be a real cluster.
+		if ctx, err := globalEnv.kubectl("config", "current-context"); strings.TrimSpace(ctx) != "kind-"+kindClusterName {
+			wrongContext = fmt.Sprintf("current context is %q (err: %v), want kind-%s; point KUBECONFIG at the kind cluster", strings.TrimSpace(ctx), err, kindClusterName)
+			t.Fatal(wrongContext)
+		}
 		globalEnv.setupTestResources()
 		// Cleanup will happen when the cluster is deleted or manually
 	}

@@ -2,10 +2,12 @@
 
 BINARY_NAME=kubectl-readonly
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/Evaneos/kubectl-readonly/internal/cli.version=$(VERSION)"
 
 build:
 	go build $(LDFLAGS) -o $(BINARY_NAME) .
+	go build $(LDFLAGS) -o $(BINARY_NAME)-strict ./cmd/$(BINARY_NAME)-strict
+	go build $(LDFLAGS) -o $(BINARY_NAME)-leaky ./cmd/$(BINARY_NAME)-leaky
 
 test:
 	go test -v ./...
@@ -34,12 +36,12 @@ clean:
 	rm -f $(BINARY_NAME) $(BINARY_NAME)-*
 
 install:
-	go install $(LDFLAGS) .
+	go install $(LDFLAGS) . ./cmd/...
 
-# Generate Krew manifest for a release (usage: make krew-manifest VERSION=v0.3.0)
+# Generate a Krew manifest for a release (usage: make krew-manifest VERSION=v0.3.0 [PLUGIN=readonly-strict])
 krew-manifest:
 	@if [ -z "$(VERSION)" ]; then echo "Usage: make krew-manifest VERSION=v0.3.0"; exit 1; fi
-	./scripts/generate-krew-manifest.sh $(VERSION)
+	./scripts/generate-krew-manifest.sh $(VERSION) $(PLUGIN)
 
 # Delete kind test cluster
 clean-kind:

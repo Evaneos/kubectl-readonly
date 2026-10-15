@@ -6,8 +6,33 @@ import (
 	"testing"
 )
 
+// assertModesConsistent runs every moderate case under the other modes too.
+// Strict has the moderate argument policy. Leaky may only allow what moderate
+// blocks through a secret-masking rule, recognized by its hint.
+func assertModesConsistent(t *testing.T, args []string) {
+	t.Helper()
+	moderate := Evaluate(args, ModeModerate)
+	if strict := Evaluate(args, ModeStrict); strict != moderate {
+		t.Errorf("strict %+v differs from moderate %+v (args: %v)", strict, moderate, args)
+	}
+	leaky := Evaluate(args, ModeLeaky)
+	switch {
+	case moderate.Allowed && !leaky.Allowed:
+		t.Errorf("leaky blocks what moderate allows (args: %v)", args)
+	case !moderate.Allowed && leaky.Allowed && !isSecretMaskingHint(moderate.Hint):
+		t.Errorf("leaky allows a command moderate blocks for a non-secret reason %q (args: %v)", moderate.Hint, args)
+	case !moderate.Allowed && !leaky.Allowed && isSecretMaskingHint(moderate.Hint):
+		t.Errorf("leaky still blocks a secret-masking case (hint %q, args: %v)", leaky.Hint, args)
+	}
+}
+
+func isSecretMaskingHint(hint string) bool {
+	return hint == hintSecretOutput || hint == hintRawSecrets || hint == hintKubeconfigCredentials || hint == hintDiffShowSecrets
+}
+
 func assertAllowed(t *testing.T, args []string) {
 	t.Helper()
+	assertModesConsistent(t, args)
 	allowed, _ := Check(args)
 	if !allowed {
 		t.Errorf("expected allowed, got blocked (args: %v)", args)
@@ -16,6 +41,7 @@ func assertAllowed(t *testing.T, args []string) {
 
 func assertBlocked(t *testing.T, args []string) {
 	t.Helper()
+	assertModesConsistent(t, args)
 	allowed, _ := Check(args)
 	if allowed {
 		t.Errorf("expected blocked, got allowed (args: %v)", args)
@@ -24,6 +50,7 @@ func assertBlocked(t *testing.T, args []string) {
 
 func assertHintContains(t *testing.T, args []string, want string) {
 	t.Helper()
+	assertModesConsistent(t, args)
 	allowed, hint := Check(args)
 	if allowed {
 		t.Errorf("expected blocked, got allowed (args: %v)", args)
@@ -36,6 +63,7 @@ func assertHintContains(t *testing.T, args []string, want string) {
 
 func assertNoHint(t *testing.T, args []string) {
 	t.Helper()
+	assertModesConsistent(t, args)
 	allowed, hint := Check(args)
 	if allowed {
 		t.Errorf("expected blocked, got allowed (args: %v)", args)
