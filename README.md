@@ -8,6 +8,8 @@
 
 A kubectl wrapper that only allows read-only commands. Designed to prevent accidental modifications when AI assistants (like Claude) explore Kubernetes clusters, including production.
 
+> **IMPORTANT NOTICE.** While open-sourced, kubectl-readonly is built by LLMs such as Claude Code, with humans directing. The source is open so you can read it before (moderately) trusting it, and it's an anti-footgun tool, not a security boundary: it prevents accidents, not attacks (see [Philosophy & Limitations](#philosophy--limitations)).
+
 ## Requirements
 
 - `kubectl` must be installed and available in your PATH
@@ -133,7 +135,7 @@ The `kustomize` command is allowed for local manifest rendering, but the followi
 
 ## Secrets Protection
 
-`kubectl-readonly` allows you to see that secrets exist (metadata) but blocks access to their actual values:
+`kubectl-readonly` makes a reasonable effort to block the obvious ways secret values reach your terminal or logs, while keeping everyday commands usable.
 
 ```bash
 # Allowed - shows secret names, types, and ages (no values)
@@ -142,14 +144,24 @@ kubectl-readonly get secrets -o wide
 kubectl-readonly get secrets -o name
 kubectl-readonly describe secret my-secret  # shows size, not values
 
-# Blocked - these formats expose the base64-encoded values
+# Blocked - any output format other than name/wide, however it is written
 kubectl-readonly get secrets -o yaml
 kubectl-readonly get secrets -o json
 kubectl-readonly get secret my-secret -o jsonpath='{.data}'
+kubectl-readonly get secrets -Aoyaml                 # grouped short flags
+kubectl-readonly get secrets -o name -o yaml         # last format wins
+kubectl-readonly get secrets --template '{{.items}}' # go-template without -o
 kubectl-readonly get --raw /api/v1/secrets
+kubectl-readonly get -f secret.yaml -o yaml          # -f may fetch a live secret
 ```
 
-This lets you investigate which secrets exist and how they're configured, without risk of accidentally exposing credentials in logs or terminal history.
+`config view --raw` and `config view --flatten`, which print kubeconfig
+credentials in clear, are blocked as well.
+
+Files passed to `-f`/`-k` are opaque to the tool, so it treats them as possible
+secrets: a value-printing format with `-f` is blocked whatever the file
+(`get -f deployment.yaml -o yaml` included), while `-o name` and `-o wide` stay
+allowed.
 
 ## Long-running commands
 
@@ -213,7 +225,7 @@ Only use `kubectl` directly for write operations (create, apply, delete, exec, e
 
 ### Result
 
-Claude can then run any read-only kubectl command without asking for permission, while dangerous commands like `delete`, `apply`, or `exec` will be blocked.
+Claude can then run any read-only kubectl command without asking for permission, while dangerous commands like `delete`, `apply`, or `exec` are blocked. That covers the common footguns, not every possible one.
 
 ## Philosophy & Limitations
 
