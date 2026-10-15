@@ -32,7 +32,7 @@ Write everything in English: code, comments, docs, commit messages, PR descripti
 
 ## Release
 
-Push a semver tag `vX.Y.Z`: GoReleaser builds the three binaries (one archive each) and the krew-release-bot opens one krew-index PR per plugin. A new plugin is submitted to krew-index by hand the first time.
+Push a semver tag `vX.Y.Z`: GoReleaser builds the three binaries (one archive each) and the krew-release-bot opens one krew-index PR per plugin. For a new plugin, that PR adds its manifest and waits for review by the krew maintainers.
 
 ## Kubernetes cluster access
 
