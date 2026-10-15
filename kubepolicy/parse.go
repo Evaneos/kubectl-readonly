@@ -247,6 +247,23 @@ func revealsKubeconfigSecrets(args []string) bool {
 	return false
 }
 
+// revealsSecretsInDiff reports whether a 'diff' would print Secret values in
+// clear. diff masks them by default; --show-secrets turns the masking off.
+func revealsSecretsInDiff(args []string) bool {
+	for _, a := range args {
+		switch {
+		case a == "--show-secrets":
+			return true
+		case strings.HasPrefix(a, "--show-secrets="):
+			_, v, _ := strings.Cut(a, "=")
+			if on, err := strconv.ParseBool(v); err != nil || on {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func containsRawSecretsAccess(args []string) bool {
 	for i, arg := range args {
 		var rawValue string

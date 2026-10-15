@@ -36,6 +36,9 @@ func Check(args []string) (bool, string) {
 		if containsRawSecretsAccess(norm) {
 			return false, "use 'get secrets' without --raw to view secret metadata safely"
 		}
+		if command == "diff" && revealsSecretsInDiff(norm) {
+			return false, "use 'diff' without --show-secrets; it reveals secret values"
+		}
 		if command == "kustomize" {
 			if flag := blockedKustomizeFlag(norm); flag != "" {
 				return false, fmt.Sprintf("flag %s is not allowed in read-only mode", flag)
