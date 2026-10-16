@@ -5,7 +5,7 @@ metadata:
 spec:
   version: {{ .TagName }}
   homepage: https://github.com/Evaneos/kubectl-readonly
-  shortDescription: Read-only kubectl wrapper that shows secret values
+  shortDescription: Read-only wrapper that shows secret values
   description: |
     The leaky profile of kubectl-readonly: the same guardrail against writes and
     exec, and secret values are shown. get secret -o yaml, get --raw on secret

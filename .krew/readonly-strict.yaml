@@ -5,7 +5,7 @@ metadata:
 spec:
   version: {{ .TagName }}
   homepage: https://github.com/Evaneos/kubectl-readonly
-  shortDescription: Read-only kubectl wrapper with a sanitized environment
+  shortDescription: Read-only wrapper with a sanitized environment
   description: |
     The strict profile of kubectl-readonly: the same read-only policy (writes,
     exec and secret values blocked), and kubectl runs without
