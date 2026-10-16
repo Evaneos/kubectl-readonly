@@ -115,13 +115,7 @@ Follow [Semantic Versioning](https://semver.org/):
 
 [Krew](https://krew.sigs.k8s.io/) is the kubectl plugin manager. Publishing allows users to install with `kubectl krew install readonly`.
 
-### Releases
-
-Each tag triggers [krew-release-bot](https://github.com/rajatjindal/krew-release-bot) in the release workflow, once per plugin. It opens the krew-index PR for each plugin, including the first one for a new plugin: that PR adds `plugins/<plugin>.yaml` and waits for review by the krew maintainers, while version bumps are merged automatically.
-
-### Manual submission
-
-If the bot cannot open the PR, submit the manifest by hand:
+### First-time Setup (submit to krew-index)
 
 1. **Create a release** (see above)
 
@@ -151,8 +145,12 @@ If the bot cannot open the PR, submit the manifest by hand:
    ```
 
 6. **Submit a PR** to [kubernetes-sigs/krew-index](https://github.com/kubernetes-sigs/krew-index):
-   - Title: `Add readonly plugin`
+   - Title: `Add <plugin> plugin`
    - Include a description of what the plugin does
+
+### Updating an Existing Krew Plugin
+
+Each plugin is submitted to krew-index by hand the first time (repeat the steps above per plugin); krew maintainers close first submissions opened by the bot. For each later tag, the release workflow runs [krew-release-bot](https://github.com/rajatjindal/krew-release-bot), which opens the krew-index PR for each plugin.
 
 ### Krew Manifest Location
 

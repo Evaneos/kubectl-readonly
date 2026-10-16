@@ -31,8 +31,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # continue-on-error: one plugin failing must not skip the others; the last
-      # step still fails the job.
+      # continue-on-error: one plugin failing (e.g. not yet in krew-index) must
+      # not skip the others; the last step still fails the job.
       - name: Update krew-index (readonly)
         id: krew_readonly
         continue-on-error: true
