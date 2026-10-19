@@ -45,12 +45,24 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Download latest release binary
+      - name: Download latest release binaries
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*_linux_amd64.tar.gz' --output release.tar.gz
-          tar xzf release.tar.gz kubectl-readonly
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*_linux_amd64.tar.gz' --dir release
+          mkdir bin
+          for a in release/*.tar.gz; do tar xzf "$a" -C bin --wildcards 'kubectl-readonly*'; done
 
-      - name: Scan binary
-        run: for i in 1 2 3; do govulncheck -mode=binary kubectl-readonly; rc=$?; [ "$rc" = 0 ] || [ "$rc" = 3 ] && exit "$rc"; [ "$i" = 3 ] || sleep 20; done; exit 1
+      - name: Scan binaries
+        run: |
+          found=0
+          for b in bin/*; do
+            for i in 1 2 3; do
+              rc=0; govulncheck -mode=binary "$b" || rc=$?
+              [ "$rc" = 0 ] || [ "$rc" = 3 ] && break
+              [ "$i" = 3 ] && exit 1
+              sleep 20
+            done
+            [ "$rc" = 3 ] && found=1
+          done
+          [ "$found" = 0 ] || exit 3
