@@ -15,7 +15,7 @@ jobs:
   source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -26,11 +26,11 @@ jobs:
           check-latest: true
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
       # vuln.go.dev answers 5xx from time to time: retry, except on findings (exit 3).
       - name: Scan source
-        run: for i in 1 2 3; do govulncheck ./...; rc=$?; [ "$rc" = 0 ] || [ "$rc" = 3 ] && exit "$rc"; [ "$i" = 3 ] || sleep 20; done; exit 1
+        run: for i in 1 2 3; do rc=0; govulncheck ./... || rc=$?; [ "$rc" = 0 ] || [ "$rc" = 3 ] && exit "$rc"; [ "$i" = 3 ] || sleep 20; done; exit 1
 
   # A published binary keeps the stdlib it was built with: only a rescan catches CVEs disclosed after the release.
   latest-release:
@@ -43,7 +43,7 @@ jobs:
           go-version: stable
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
       - name: Download latest release binaries
         env:
