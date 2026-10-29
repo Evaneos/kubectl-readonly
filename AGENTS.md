@@ -4,6 +4,11 @@
 
 Write everything in English: code, comments, docs, commit messages, PR descriptions, issue replies and any other GitHub comment. This is a public repository.
 
+## Voice of the docs
+
+- Honest, a little self-deprecating, never a false sense of security: the tool is anti-footgun, not anti-hacking. `Philosophy & Limitations` in the README is the model.
+- Say plainly that the code is written by LLMs with humans directing; do not stage a human reviewer who is not there.
+
 ## Layout
 
 - `kubepolicy/` — the read-only policy, importable as a library. `Evaluate(args, mode)` is the entry point, `Check(args)` its moderate shorthand; the allowlists and blocked flags live in `kubepolicy/policy.go`.
