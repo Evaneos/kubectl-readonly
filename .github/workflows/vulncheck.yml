@@ -41,28 +41,50 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
+          cache: false
 
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
       - name: Download latest release binaries
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*_linux_amd64.tar.gz' --dir release
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*_linux_amd64.tar.gz' --dir release
           mkdir bin
           for a in release/*.tar.gz; do tar xzf "$a" -C bin --wildcards 'kubectl-readonly*'; done
 
+      # With -format json, govulncheck exits 0 even on findings: a non-zero exit is a scan error, retried.
       - name: Scan binaries
         run: |
-          found=0
+          mkdir scan
           for b in bin/*; do
             for i in 1 2 3; do
-              rc=0; govulncheck -mode=binary "$b" || rc=$?
-              [ "$rc" = 0 ] || [ "$rc" = 3 ] && break
+              govulncheck -mode=binary -format json "$b" > "scan/${b#bin/}.json" && break
               [ "$i" = 3 ] && exit 1
               sleep 20
             done
-            [ "$rc" = 3 ] && found=1
           done
-          [ "$found" = 0 ] || exit 3
+
+      # Keeps only symbol-level findings, the ones that fail govulncheck in text mode.
+      - name: Report findings
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          jq -rn --arg tag "$TAG" '
+            [inputs | . + {bin: (input_filename | ltrimstr("scan/") | rtrimstr(".json"))}] as $msgs
+            | ($msgs | map(select(.osv) | {(.osv.id): .osv}) | add // {}) as $osv
+            | $msgs | map(select(.finding.trace[0].function) | .finding + {bin}) | group_by(.osv)[]
+            | .[0] as $f | $f.trace[0] as $t | $osv[$f.osv] as $o
+            | (if $f.fixed_version == null then "No fix released yet: watch the advisory."
+               elif $t.module == "stdlib" then "Fixed in Go \($f.fixed_version | ltrimstr("v")): push a new release tag, the release workflow builds with the latest Go patch."
+               else "Fixed in \($t.module)@\($f.fixed_version): bump it in go.mod, then push a new release tag." end) as $fix
+            | "::error title=\($f.osv) in release \($tag)::"
+              + ("\(map(.bin) | unique | join(", ")) embed \($t.module)@\($t.version): \($o.summary). \($fix) https://pkg.go.dev/vuln/\($f.osv)"
+                 | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))
+          ' scan/*.json > findings
+          cat findings
+          [ ! -s findings ]
